@@ -28,3 +28,5 @@ npm run start
 ```
 
 From here a page should open in your browser and a react loading screen will appear
+
+If there are any problems or you can't get it working please feel free to let me know! :D
