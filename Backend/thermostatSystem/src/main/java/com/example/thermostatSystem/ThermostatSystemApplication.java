@@ -8,6 +8,7 @@ public class ThermostatSystemApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(ThermostatSystemApplication.class, args);
+//		SpringApplication.run(TopicCreator.class, args);
 	}
 
 }
