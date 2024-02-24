@@ -17,10 +17,16 @@ public class ProxyServer {
                 // Read client request
                 BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 String request = "";
-                while (reader.readLine() != null) {
+               // while (reader.readLine() != null) {
                     request += reader.readLine();
+                request += reader.readLine();
+                request += reader.readLine();
+                request += reader.readLine();
+                request += reader.readLine();
+                request += reader.readLine();
+                request += reader.readLine();
                     System.out.println("Received request: " + request);
-                }
+                //}
 
                 
 
@@ -28,30 +34,30 @@ public class ProxyServer {
                 // Central server's port number
                 int centralServerPort = 10000; 
 
-                try {
-                    // Create a socket connection to the central server
-                    Socket socket = new Socket(centralServerAddress, centralServerPort);
-                
-                    // Create output stream to send request
-                    OutputStream outputStream = socket.getOutputStream();
-                    PrintWriter out = new PrintWriter(outputStream, true);
-                
-                    // Send request to the server
-                    out.println(request);
-                    // out.println(); // Empty line to indicate end of request headers
-                
-                    // Close the client socket
-                    clientSocket.close(); // <-- Add this line
-                
-                    // Create input stream to receive response
-                    InputStream inputStream = socket.getInputStream();
-                    BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-                    out.close();
-                    in.close();
-                    socket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+//                try {
+//                    // Create a socket connection to the central server
+//                    Socket socket = new Socket(centralServerAddress, centralServerPort);
+//
+//                    // Create output stream to send request
+//                    OutputStream outputStream = socket.getOutputStream();
+//                    PrintWriter out = new PrintWriter(outputStream, true);
+//
+//                    // Send request to the server
+//                    out.println(request);
+//                    // out.println(); // Empty line to indicate end of request headers
+//
+//                    // Close the client socket
+//                    clientSocket.close(); // <-- Add this line
+//
+//                    // Create input stream to receive response
+//                    InputStream inputStream = socket.getInputStream();
+//                    BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+//                    out.close();
+//                    in.close();
+//                    socket.close();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
             }
             
         } catch (IOException e) {
