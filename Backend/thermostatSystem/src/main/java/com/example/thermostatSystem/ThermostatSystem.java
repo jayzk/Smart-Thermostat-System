@@ -4,6 +4,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 import java.util.Random;
+import java.util.logging.Logger;
 
 public class ThermostatSystem {
     int currentTemp;
@@ -15,6 +16,7 @@ public class ThermostatSystem {
     final int SENDER_PARTITION = 1;
 
     boolean isChangingTemperature = false;
+    private static final Logger log = Logger.getLogger(ThermostatSystem.class.getName());
 
     public ThermostatSystem(String roomId) {
         this.roomId = roomId;
@@ -66,7 +68,6 @@ public class ThermostatSystem {
     }
 
 
-
     public int getCurrentTemp() {
         return currentTemp;
     }
@@ -80,8 +81,8 @@ public class ThermostatSystem {
                 while (currentTemp < new_temperature) {
                     currentTemp += 1;
                     sendTempChangeMessage(currentTemp);
-                    System.out.println("Increased");
-                    System.out.println("Now it is: " + currentTemp);
+                    log.info("Increased - for room: " + roomId);
+                    log.info("Now it is: " + currentTemp);
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -92,8 +93,8 @@ public class ThermostatSystem {
                 while (currentTemp > new_temperature) {
                     currentTemp -= 1;
                     sendTempChangeMessage(currentTemp);
-                    System.out.println("Decreased to");
-                    System.out.println("Now it is: " + currentTemp);
+                    log.info("Decreased - for room: " + roomId);
+                    log.info("Now it is: " + currentTemp);
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
