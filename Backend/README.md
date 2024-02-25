@@ -62,4 +62,7 @@ the system depends on each topic to have 2 topics. To confirm that 2 partitions 
 
 (Ignore all the `Topic: __consumer_offsets`)
 
-
+> [!NOTE]
+> If you are still getting 1 partition delete the folders kafka-logs
+> For Mac: type in terminal: rm -rf ~/tmp/kafka-logs
+> For Windows: go into C:\tmp\kafka-logs and delete the folder kafka-logs
