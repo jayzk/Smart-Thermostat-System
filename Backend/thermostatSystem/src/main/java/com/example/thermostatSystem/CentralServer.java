@@ -9,12 +9,16 @@ import org.json.JSONObject;
 
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.Lock;
@@ -23,7 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
 @Component
 public class CentralServer {
     private static final int NUM_SERVERS = 4; // Number of server instances
-    private static final String SERVER_HOST = "localhost";
+    // private static final String SERVER_HOST = "localhost";
 
     @Value("${central-server.ports}")
     private int[] SERVER_PORT;
@@ -40,6 +44,8 @@ public class CentralServer {
         executor = Executors.newFixedThreadPool(NUM_SERVERS);
         serverSockets = new ArrayList<>();
         sharedMemory = new SharedMemory();
+        // INITIALIZING 5 rooms values to 0 everything. 
+        sharedMemory.initializeHashMap(5);
         kafkaService = new KafkaService();
 
 
@@ -55,8 +61,10 @@ public class CentralServer {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            //
+            // int roomNum = 0;
             System.out.println("Contents of shared memory:");
-            System.out.println(sharedMemory.readInstructions());
+            sharedMemory.printHashMap();
             System.out.println("Shutdown complete.");
         }));
 
@@ -86,30 +94,54 @@ public class CentralServer {
             System.out.println("Some Exception has occurred " + e);
         }
     }
-}
+
 
 class SharedMemory {
-    private List<String> instructions;
+    private Map<Integer, int[]> roomTemp;
     private final Lock mutex;
 
     public SharedMemory() {
-        this.instructions = new ArrayList<>();
+        this.roomTemp = new HashMap<>();
         this.mutex = new ReentrantLock();
     }
 
-    public void writeInstructions(String instruction) {
+    public void writeInstructions(int roomNum, int currentTemp, int changedTemp) {
         mutex.lock();
         try {
-            this.instructions.add(instruction);
+            int[] temperatures = {currentTemp, changedTemp};
+            roomTemp.put(roomNum, temperatures);
         } finally {
             mutex.unlock();
         }
     }
 
-    public List<String> readInstructions() {
+    public int[] readInstructions(int roomNum) {
         mutex.lock();
         try {
-            return new ArrayList<>(this.instructions);
+            return roomTemp.getOrDefault(roomNum, null);
+        } finally {
+            mutex.unlock();
+        }
+    }
+    public void printHashMap() {
+        mutex.lock();
+        try {
+            System.out.println("Contents of HashMap:");
+            for (Map.Entry<Integer, int[]> entry : roomTemp.entrySet()) {
+                int roomNumber = entry.getKey();
+                int[] temperatures = entry.getValue();
+                System.out.println("Room: " + roomNumber + ", Current Temp: " + temperatures[0] + ", Changed Temp: " + temperatures[1]);
+            }
+        } finally {
+            mutex.unlock();
+        }
+    }
+    public void initializeHashMap(int maxRoomNumber) {
+        mutex.lock();
+        try {
+            for (int roomNumber = 1; roomNumber <= maxRoomNumber; roomNumber++) {
+                roomTemp.put(roomNumber, new int[]{0, 0});
+            }
         } finally {
             mutex.unlock();
         }
@@ -137,20 +169,36 @@ class ClientHandler extends Thread {
             String instruction;
 
             while ((instruction = reader.readLine()) != null) {
-                sharedMemory.writeInstructions(instruction);
+                //sharedMemory.writeInstructions(instruction);
                 JSONObject roomTempJson = new JSONObject(instruction);
                 System.out.println(roomTempJson.get("room"));
 
-                // Extract room and temperature values
+                int type = roomTempJson.getInt("type");
                 int room = roomTempJson.getInt("room");
-                int temperature = roomTempJson.getInt("temperature");
+                
 
-                kafkaService.setRoomTopic("room" + room);
-                kafkaService.produce(0, temperature);
-                System.out.println("Instruction received from client and written to shared memory: " + instruction);
+                if (type == 0){
+                    //Check current temperature
+                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+                    int[] currentTemperature = sharedMemory.readInstructions(room); 
+                    writer.write(currentTemperature.toString());
+                    writer.flush();
+                    writer.close();
+                }
+                else{
+                    int temperature = roomTempJson.getInt("temperature");
+                    //Change temperature
+                    // Extract room and temperature values
+                    int[] currentTemperature = sharedMemory.readInstructions(room); 
+                    sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
+                    kafkaService.setRoomTopic("room" + room);
+                    kafkaService.produce(0, temperature);
+                }
+                // System.out.println("Instruction received from client and written to shared memory: " + instruction);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+}
 }
