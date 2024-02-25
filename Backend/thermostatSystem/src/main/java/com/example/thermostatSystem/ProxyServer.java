@@ -100,8 +100,8 @@ public class ProxyServer {
         //central server sends the current temp
         //obtain the current temp
         String currentTemp = "";
-        try (ServerSocket proxyServerSocket = new ServerSocket(8081)) {
-            System.out.println("Load balancer server started on port " + 8081);
+        try (ServerSocket proxyServerSocket = new ServerSocket(10000)) {
+            System.out.println("Load balancer server started on port " + 10000);
             while (true) {
                 Socket clientSocket = proxyServerSocket.accept();
                 System.out.println("Get respond request to frontend from central server.");
@@ -113,7 +113,7 @@ public class ProxyServer {
                 currentTemp += reader.readLine();
 
                 System.out.println("Received respond: " + currentTemp);
-                clientSocket.close();
+                //clientSocket.close();
             }
         } catch (IOException e) {
             e.printStackTrace();
