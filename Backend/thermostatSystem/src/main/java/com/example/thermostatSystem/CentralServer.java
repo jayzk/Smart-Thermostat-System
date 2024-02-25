@@ -1,6 +1,13 @@
 package com.example.thermostatSystem;
 
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.json.JSONObject;
+
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -13,28 +20,28 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+@Component
 public class CentralServer {
     private static final int NUM_SERVERS = 4; // Number of server instances
     private static final String SERVER_HOST = "localhost";
-    private static int[] SERVER_PORT = new int[NUM_SERVERS]; // Array to hold server ports
+
+    @Value("${central-server.ports}")
+    private int[] SERVER_PORT;
+
     private static ExecutorService executor;
     private static List<ServerSocket> serverSockets;
     private static SharedMemory sharedMemory;
 
-    public static void main(String[] args) {
-        if (args.length != NUM_SERVERS) {
-            System.out.println("Please provide exactly " + NUM_SERVERS + " port numbers.");
-            return;
-        }
+    private KafkaService kafkaService;
 
-        // Parse command line arguments to get server ports
-        for (int i = 0; i < NUM_SERVERS; i++) {
-            SERVER_PORT[i] = Integer.parseInt(args[i]);
-        }
 
+    @Bean
+    public void initCentralServer() {
         executor = Executors.newFixedThreadPool(NUM_SERVERS);
         serverSockets = new ArrayList<>();
         sharedMemory = new SharedMemory();
+        kafkaService = new KafkaService();
+
 
         // Add shutdown hook to close server sockets
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -67,6 +74,7 @@ public class CentralServer {
                             System.out.println("Client connected to port " + port);
                             // Handle the client connection (e.g., create a new thread to handle it)
                             ClientHandler clientHandler = new ClientHandler(clientSocket, sharedMemory);
+                            clientHandler.setKafkaService(kafkaService);
                             clientHandler.start();
                         }
                     } catch (Exception e) {
@@ -112,10 +120,15 @@ class SharedMemory {
 class ClientHandler extends Thread {
     private final Socket clientSocket;
     private final SharedMemory sharedMemory;
+    private KafkaService kafkaService;
 
     public ClientHandler(Socket socket, SharedMemory sharedMemory) {
         this.clientSocket = socket;
         this.sharedMemory = sharedMemory;
+    }
+
+    public void setKafkaService(KafkaService service){
+        this.kafkaService = service;
     }
 
     public void run() {
@@ -123,9 +136,17 @@ class ClientHandler extends Thread {
             BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             String instruction;
 
-            //TODO: add queues here
             while ((instruction = reader.readLine()) != null) {
                 sharedMemory.writeInstructions(instruction);
+                JSONObject roomTempJson = new JSONObject(instruction);
+                System.out.println(roomTempJson.get("room"));
+
+                // Extract room and temperature values
+                int room = roomTempJson.getInt("room");
+                int temperature = roomTempJson.getInt("temperature");
+
+                kafkaService.setRoomTopic("room" + room);
+                kafkaService.produce(0, temperature);
                 System.out.println("Instruction received from client and written to shared memory: " + instruction);
             }
         } catch (IOException e) {

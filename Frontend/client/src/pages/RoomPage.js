@@ -22,8 +22,8 @@ function RoomPage() {
 
   // Data to send with the request
   const data = {
-    room: 432,
-    temperature: 23,
+    room: roomNum,
+    temperature: desiredTemp,
   };
 
   const url = "http://localhost:8080/endpoint";
