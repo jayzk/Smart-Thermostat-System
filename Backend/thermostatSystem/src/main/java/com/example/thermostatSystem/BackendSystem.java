@@ -1,15 +1,10 @@
 package com.example.thermostatSystem;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @Component
-public class HotelSystem {
+public class BackendSystem {
     @Bean
     public void createThermostatSystems() {
         String[] roomIds = {"room1", "room2", "room3"}; // Add more room IDs as needed

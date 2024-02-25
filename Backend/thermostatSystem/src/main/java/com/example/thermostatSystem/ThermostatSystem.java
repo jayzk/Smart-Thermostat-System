@@ -16,8 +16,6 @@ public class ThermostatSystem {
 
     boolean isChangingTemperature = false;
 
-
-
     public ThermostatSystem(String roomId) {
         this.roomId = roomId;
         currentTemp = (int) ((Math.random() * (MAX_TEMP - MIN_TEMP)) + MIN_TEMP);
@@ -29,10 +27,9 @@ public class ThermostatSystem {
     }
 
     public void listenForChangeTemp(){
-        System.out.println("Here ma boy");
         while (true){
             ConsumerRecords<String, String> records = kafka.consume();
-            if(!kafka.consume().isEmpty()){
+            if(!records.isEmpty()){
                 ConsumerRecord<String, String> lastRecord = null;
                 for (ConsumerRecord<String, String> record : records){
                     System.out.printf("offset = %d, key = %s, value = %s%n", record.offset(), record.key(), record.value());

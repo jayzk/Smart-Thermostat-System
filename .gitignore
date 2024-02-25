@@ -41,6 +41,9 @@ src/.DS_Store
 .idea/**/libraries
 
 Backend/kafka_2.12-3.6.1/logs/*
+Backend/kafka_2.12-3.6.1/logs/server.log
+Backend/kafka_2.12-3.6.1/logs/state-change.log
+Backend/kafka_2.12-3.6.1/logs/log-cleaner.log
 
 # Gradle and Maven with auto-import
 # When using Gradle or Maven with auto-import, you should exclude module files,

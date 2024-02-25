@@ -14,13 +14,22 @@ import java.util.Properties;
 
 public class KafkaService {
 
-    private final KafkaConsumer<String, String> consumer;
-    private final KafkaProducer<String, String> producer;
-    private final String roomTopic;
+    private KafkaConsumer<String, String> consumer;
+    private KafkaProducer<String, String> producer;
+    private String roomTopic;
 
     public KafkaService(String roomTopic){
         consumer = setKafkaConsumer();
         producer = setKafkaProducer();
+        this.roomTopic = roomTopic;
+    }
+
+    public KafkaService(){
+        consumer = setKafkaConsumer();
+        producer = setKafkaProducer();
+    }
+
+    public void setRoomTopic(String roomTopic){
         this.roomTopic = roomTopic;
     }
 

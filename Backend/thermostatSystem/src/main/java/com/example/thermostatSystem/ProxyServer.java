@@ -28,7 +28,7 @@ public class ProxyServer {
 //    }
 
     @PostMapping("/endpoint")
-    @CrossOrigin(origins = "http://localhost:8081")
+    @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
     public String handlePostRequest(@RequestBody String requestBody) {
         // Process the request body
         System.out.println("Received POST request with body: " + requestBody);
