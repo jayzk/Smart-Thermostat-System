@@ -14,6 +14,7 @@ import java.util.Map;
 @RestController
 public class ProxyServer {
 
+    Socket socket;
 
     @PostMapping("/endpoint")
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
@@ -51,8 +52,6 @@ public class ProxyServer {
         return "ACK from proxy server";
     }
 
-    
-
     @GetMapping("/currentTemp")
     //change temp request
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
@@ -65,64 +64,32 @@ public class ProxyServer {
         String centralServerAddress = "127.0.0.1";
         // Central server's port number
         int centralServerPort = 10000;
-
-            try {
-                // Create a socket connection to the central server
-                Socket socket = new Socket(centralServerAddress, centralServerPort);
-
-                // Create output stream to send request
-                OutputStream outputStream = socket.getOutputStream();
-                PrintWriter out = new PrintWriter(outputStream, true);
-
-                //For checking temperature -
-                //send to central server this:
-                /**
-                 * {
-                 *      type: 0,
-                 *      room: 5
-                 * }
-                */
-                String data= "{ \"type\": 0, \"room\":" + roomNum + "}";
-                out.println(data);
-
-
-                // Create input stream to receive response
-                InputStream inputStream = socket.getInputStream();
-                BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-                out.close();
-                in.close();
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-        //wait for central server to send the current temp (keep socket open)
-        //central server sends the current temp
-        //obtain the current temp
         String currentTemp = "";
-        try (ServerSocket proxyServerSocket = new ServerSocket(10000)) {
-            System.out.println("Load balancer server started on port " + 10000);
-            while (true) {
-                Socket clientSocket = proxyServerSocket.accept();
-                System.out.println("Get respond request to frontend from central server.");
+        try {
+            // Create a socket connection to the central server
+            Socket socket = new Socket(centralServerAddress, centralServerPort);
 
-                // Read client request
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                
+            // Create output stream to send request
+            OutputStream outputStream = socket.getOutputStream();
+            PrintWriter out = new PrintWriter(outputStream, true);
 
-                currentTemp += reader.readLine();
+            String data= "{ \"type\": 0, \"room\":" + roomNum + "}";
+            out.println(data);
 
-                System.out.println("Received respond: " + currentTemp);
-                //clientSocket.close();
-            }
+
+            // Create input stream to receive response
+            InputStream inputStream = socket.getInputStream();
+            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+            currentTemp = in.readLine();
+            out.close();
+            in.close();
+            socket.close();
+
+            System.out.println("Sockets closed!");
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        //send back to client using http request
-        //return new ResponseEntity<>(
-        //      "Current temp is " + currentTemp,
-        //      HttpStatus.OK);
         return new ResponseEntity<String>(currentTemp, HttpStatus.OK);
 
     }

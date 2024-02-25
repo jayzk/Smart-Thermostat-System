@@ -166,34 +166,24 @@ class ClientHandler extends Thread {
     public void run() {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            System.out.println("TEST: " + clientSocket.isClosed());
             String instruction;
 
             while ((instruction = reader.readLine()) != null) {
-                System.out.println("TEST2: " + clientSocket.isClosed());
-                //sharedMemory.writeInstructions(instruction);
                 JSONObject roomTempJson = new JSONObject(instruction);
-                System.out.println(roomTempJson.get("room"));
 
                 int type = roomTempJson.getInt("type");
                 int room = roomTempJson.getInt("room");
                 
 
                 if (type == 0){
-                    System.out.println("TEST3: " + clientSocket.isClosed());
                     //Check current temperature
                     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
                     int[] currentTemperature = sharedMemory.readInstructions(room);
 
-                    System.out.println("TEST5: " + clientSocket.isClosed());
-                    writer.write(currentTemperature.toString());
+                    writer.write(Integer.toString(currentTemperature[0]) + "\n");
                     writer.flush();
-                    //writer.close();
-
-                    System.out.println("TEST6: " + clientSocket.isClosed());
                 }
                 else{
-                    System.out.println("TEST4: " + clientSocket.isClosed());
                     int temperature = roomTempJson.getInt("temperature");
                     //Change temperature
                     // Extract room and temperature values
@@ -202,7 +192,6 @@ class ClientHandler extends Thread {
                     kafkaService.setRoomTopic("room" + room);
                     kafkaService.produce(0, temperature);
                 }
-                // System.out.println("Instruction received from client and written to shared memory: " + instruction);
             }
         } catch (IOException e) {
             e.printStackTrace();
