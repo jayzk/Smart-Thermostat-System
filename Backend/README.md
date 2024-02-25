@@ -1,6 +1,4 @@
-Feel free to setup the backend components here
-
-# Kafka Setup
+# Kafka Setup (Apple)
 
 ## Add Kafka binary files to your $PATH
 Setup the `$PATH` environment variable
@@ -28,4 +26,29 @@ and run the following commands to get started with Kafka
 ### Optional: Testing that Kafka works
 Run the producer (which is basically a message intake to the queue)
 ``
+
+# Kafka Setup (Windows)
+1. Install Kafka [here](https://kafka.apache.org/downloads)
+> [!NOTE]
+> Download the 2.12 version
+
+2. Extract the folder
+> [!NOTE]
+> I would recommend moving the folder to your C Drive and renaming it to just "kafka"
+
+3. Start up zookeeper
+Go into the kafka folder and open up the terminal
+Start zookeeper by typing in this command
+```
+.\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+```
+
+4. Start the kafka server
+Open up another terminal in the kafka folder
+Start the server by typing in this command
+```
+.\bin\windows\kafka-server-start.bat .\config\server.properties
+```
+
+5. Run ThermostatBackendApplication in the backend folder of the project
 
