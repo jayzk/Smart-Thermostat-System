@@ -11,7 +11,7 @@ function RoomPage() {
     try {
       const response = await fetch(`http://localhost:8080/currentTemp?roomNum=${roomNum}`);
       const jsonData = await response.json();
-      setCurrentTemp(jsonData.temperature);
+      setCurrentTemp(jsonData);
 
       console.log("Data received:", jsonData); // Log data to the console
     } catch (error) {
