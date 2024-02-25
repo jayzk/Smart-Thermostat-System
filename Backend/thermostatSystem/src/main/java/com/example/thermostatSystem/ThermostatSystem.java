@@ -24,6 +24,7 @@ public class ThermostatSystem {
         kafka = new KafkaService(this.roomId);
         kafka.initConsumer(LISTENER_PARTITION);
         startFluctuationThread();
+        sendTempChangeMessage();
         Thread listenThread = new Thread(this::listenForChangeTemp);
         listenThread.start();
     }
@@ -45,7 +46,7 @@ public class ThermostatSystem {
         }
     }
 
-    public void sendTempChangeMessage(int currentTemp){
+    public void sendTempChangeMessage(){
         kafka.produce(SENDER_PARTITION, currentTemp);
     }
 
@@ -80,7 +81,7 @@ public class ThermostatSystem {
             if (currentTemp < new_temperature) {
                 while (currentTemp < new_temperature) {
                     currentTemp += 1;
-                    sendTempChangeMessage(currentTemp);
+                    sendTempChangeMessage();
                     log.info("Increased - for room: " + roomId);
                     log.info("Now it is: " + currentTemp);
                     try {
@@ -92,7 +93,7 @@ public class ThermostatSystem {
             } else if (currentTemp > new_temperature) {
                 while (currentTemp > new_temperature) {
                     currentTemp -= 1;
-                    sendTempChangeMessage(currentTemp);
+                    sendTempChangeMessage();
                     log.info("Decreased - for room: " + roomId);
                     log.info("Now it is: " + currentTemp);
                     try {
