@@ -21,47 +21,8 @@ function RoomPage() {
 
   // Data to send with the request
   const data = {
-<<<<<<< HEAD
-<<<<<<< HEAD
-    room: 1,
-    temperature: desiredTemp
-  };
-
-  const url = 'http://localhost:8080/';
-  // Options for the fetch request
-  const options = {
-    method: 'POST', // or 'GET', 'PUT', 'DELETE', etc.
-    headers: {
-      'Content-Type': 'application/json'
-      // Add any other headers as needed
-    },
-    body: JSON.stringify(data) // Convert data to JSON string
-  };
-
-  const setTemperature = () => {
-    
-    fetch(url, options)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response.json(); // Parse response body as JSON
-    })
-    .then(data => {
-      console.log('Response:', data);
-      // Do something with the response data
-    })
-    .catch(error => {
-      console.error('There was a problem with the fetch operation:', error);
-    });
-    
-=======
-    room: 432,
-    temperature: 23,
-=======
     room: roomNum,
     temperature: desiredTemp,
->>>>>>> 441c42e843b821c350a0294599a42a6e3ae04b5d
   };
 
   const url = "http://localhost:8080/endpoint";
@@ -81,7 +42,6 @@ function RoomPage() {
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
       });
->>>>>>> 2c87d4f2e0afb3207804d8a75448e630c29d9108
   };
 
   return (
