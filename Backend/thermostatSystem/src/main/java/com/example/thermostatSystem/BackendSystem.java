@@ -6,8 +6,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class BackendSystem {
-    @Value("${kafka.topics}")
-    private String[] topicNames;
+    @Value("${kafka.number-of-rooms}")
+    private int numberOfRooms;
 
     @Bean
     public void createThermostatSystems() {
@@ -17,9 +17,9 @@ public class BackendSystem {
         //Queue key = 0: current temp
         //Queue key = 1: change temp
 
-        for (String roomId : topicNames) {
-            System.out.println("room:" + roomId);
-            createThermostatSystem(roomId);
+
+        for (int roomNum = 1; roomNum <= numberOfRooms; roomNum++) {
+            createThermostatSystem("room" + roomNum);
         }
     }
 
