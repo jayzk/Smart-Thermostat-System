@@ -1,11 +1,18 @@
 import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 
 function LoginPage() {
+  const [roomNum, setRoomNum] = useState(0); // Initialize roomNum state
+
+  const handleRoomNumChange = (event) => {
+    setRoomNum(event.target.value); // Update roomNum state as user types
+  };
+
   let navigate = useNavigate();
-  const login = () =>{ 
-    let path = "/room"; 
+  const login = () => {
+    let path = `/room/${roomNum}`;
     navigate(path);
-  }
+  };
 
   return (
     <div class="container my-5 w-25">
@@ -19,6 +26,8 @@ function LoginPage() {
             class="form-control"
             id="exampleInputEmail1"
             aria-describedby="emailHelp"
+            value={roomNum}
+            onChange={handleRoomNumChange}
           />
         </div>
         <div class="mb-3">
