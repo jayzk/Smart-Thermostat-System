@@ -16,7 +16,7 @@ const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
-    path: "room",
+    path: "room/:roomNum",
     element: <RoomPage />,
   },
   {
