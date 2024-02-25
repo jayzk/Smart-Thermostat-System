@@ -1,9 +1,11 @@
 import React, { useState } from "react";
+//import { useParams } from "react-router";
+import { useParams } from "react-router-dom";
 
 function RoomPage() {
   const [desiredTemp, setDesiredTemp] = useState(20);
   const [currentTemp, setCurrentTemp] = useState(22);
-  const [roomNum, setRoomNum] = useState(1);
+  let {roomNum} = useParams();
 
   // Function to increment desired temperature
   const incrementDesiredTemp = () => {
@@ -19,8 +21,8 @@ function RoomPage() {
 
   // Data to send with the request
   const data = {
-    room: 432,
-    temperature: 23,
+    room: roomNum,
+    temperature: desiredTemp,
   };
 
   const url = "http://localhost:8080/endpoint";
