@@ -5,7 +5,6 @@ import { useParams } from "react-router-dom";
 function RoomPage() {
   const [desiredTemp, setDesiredTemp] = useState(20);
   const [currentTemp, setCurrentTemp] = useState(22);
-  //const [roomNum, setRoomNum] = useState(useParams());
   let {roomNum} = useParams();
 
   // Function to increment desired temperature
