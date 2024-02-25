@@ -3,65 +3,101 @@ package com.example.thermostatSystem;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
-
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Logger;
 
-@Component
+@Configuration
 public class TopicCreator {
 
+    private static final Logger logger = Logger.getLogger(TopicCreator.class.getName());
+
+    @Value("${kafka.bootstrap-servers}")
+    private String bootstrapServers;
+
+    @Value("${kafka.topics}")
+    private String[] topicNames;
+
     @Bean
-    public CommandLineRunner createTopics() {
+    @ConfigurationProperties("kafka")
+    public KafkaConfig kafkaConfig() {
+        return new KafkaConfig();
+    }
+
+    @Bean
+    public CommandLineRunner createTopics(AdminClient adminClient) {
         return args -> {
-            // Kafka bootstrap server
-            String bootstrapServers = "localhost:9092";
-
-            // List of topic names to create
-            List<String> topicNames = new ArrayList<>();
-            topicNames.add("room1");
-            topicNames.add("room2");
-            topicNames.add("room3");
-            topicNames.add("room4");
-            topicNames.add("room5");
-            topicNames.add("room6");
-            topicNames.add("room7");
-
-            // Number of partitions for the topics
-            int numPartitions = 2;
-
-            // Replication factor for the topics
-            short replicationFactor = 1;
-
-            // Create AdminClient properties
-            Properties props = new Properties();
-            props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-
-            try (AdminClient adminClient = AdminClient.create(props)) {
+            try {
+                Collection<NewTopic> newTopics = new ArrayList<>();
                 for (String topicName : topicNames) {
-                    // Check if the topic already exists
                     if (adminClient.listTopics().names().get().contains(topicName)) {
-                        System.out.println("Topic " + topicName + " already exists. Skipping.");
+                        logger.info("Topic '" + topicName + "' already exists. Skipping.");
                         continue;
                     }
 
-                    // Create a new Kafka topic
-                    NewTopic newTopic = new NewTopic(topicName, numPartitions, replicationFactor);
-
-                    // Add topic creation request to a list
-                    adminClient.createTopics(Collections.singletonList(newTopic));
-
-                    System.out.println("Topic " + topicName + " created successfully.");
+                    // Create a new Kafka topic with configured partitions, replication factor, and retention
+                    newTopics.add(new NewTopic(topicName,
+                            kafkaConfig().getNumPartitions(),
+                            kafkaConfig().getReplicationFactor())
+                            );
                 }
+
+                // Create topics asynchronously and handle potential errors
+                adminClient.createTopics(newTopics);
+                logger.info("Topics created successfully: " + newTopics);
             } catch (InterruptedException | ExecutionException e) {
+                logger.severe("Error creating topics: " + e.getMessage());
                 e.printStackTrace();
             }
         };
+    }
+
+    @Bean
+    public AdminClient adminClient() {
+        Properties props = new Properties();
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        return AdminClient.create(props);
+    }
+
+    // Kafka configuration class (optional)
+    public static class KafkaConfig {
+
+        private int numPartitions = 2;
+        private short replicationFactor = 1;
+        private long retentionMs = -1; // Use default retention unless specified
+
+        public int getNumPartitions() {
+            return numPartitions;
+        }
+
+        public void setNumPartitions(int numPartitions) {
+            this.numPartitions = numPartitions;
+        }
+
+        public short getReplicationFactor() {
+            return replicationFactor;
+        }
+
+        public void setReplicationFactor(short replicationFactor) {
+            this.replicationFactor = replicationFactor;
+        }
+
+        public long getRetentionMs() {
+            return retentionMs;
+        }
+
+        public void setRetentionMs(long retentionMs) {
+            this.retentionMs = retentionMs;
+        }
     }
 }

@@ -52,3 +52,14 @@ Start the server by typing in this command
 
 5. Run ThermostatBackendApplication in the backend folder of the project
 
+# !!!IMPORTANT!!!  
+## Kafka Config 
+In order to create the topics with 2 partitions each, navigate to the `server.properties` file that is inside the `kafka_2.12-3.6.1/config`
+and change the `num.partitions` to 2 from 1 (change to `num.partitions=2`). If this is not changed, it might introduce bugs as
+the system depends on each topic to have 2 topics. To confirm that 2 partitions for each topic is created, type this command from the `Smart-Thermostat-System` directory:
+`Backend/kafka_2.12-3.6.1/bin/kafka-topics.sh --describe --bootstrap-server localhost:9092`. It should have an output similar to this:
+![img.png](img.png)
+
+(Ignore all the `Topic: __consumer_offsets`)
+
+

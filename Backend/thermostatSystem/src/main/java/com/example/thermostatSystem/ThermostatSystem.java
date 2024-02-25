@@ -74,8 +74,8 @@ public class ThermostatSystem {
 
     public void changeTemp(int new_temperature) {
         isChangingTemperature = true;
-        System.out.println("Temperature change begin for " + roomId);
-        System.out.println("Current temp is: "  + currentTemp);
+        log.info("Temperature change begin for " + roomId);
+        log.info("Current temp is: "  + currentTemp);
         Thread changeTempThread = new Thread(() -> {
             if (currentTemp < new_temperature) {
                 while (currentTemp < new_temperature) {
@@ -102,7 +102,7 @@ public class ThermostatSystem {
                     }
                 }
             }
-            System.out.println("Temperature change complete");
+            log.info("Temperature change complete");
             isChangingTemperature = false;
         });
         changeTempThread.start();
