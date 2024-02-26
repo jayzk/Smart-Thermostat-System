@@ -3,18 +3,14 @@ package com.example.thermostatSystem;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+
 
 @RestController
 public class ProxyServer {
 
-    Socket socket;
 
     @PostMapping("/endpoint")
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})

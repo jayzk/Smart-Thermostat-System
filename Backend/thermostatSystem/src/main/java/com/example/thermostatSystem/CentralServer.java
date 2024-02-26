@@ -1,10 +1,11 @@
 package com.example.thermostatSystem;
 
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 import org.json.JSONObject;
 
 
@@ -36,8 +37,21 @@ public class CentralServer {
     private static List<ServerSocket> serverSockets;
     private static SharedMemory sharedMemory;
 
-    private KafkaService kafkaService;
+    private KafkaService kafkaService = new KafkaService();
 
+    public void listenForCurrentTemp(){
+        while (true){
+            ConsumerRecords<String, String> records = kafkaService.consume();
+            if(!records.isEmpty()){
+                for (ConsumerRecord<String, String> record : records){
+                    String topic = record.topic();
+                    String numberStr = topic.substring("room".length());
+                    int roomNum = Integer.parseInt(numberStr);
+                    sharedMemory.writeInstructions(roomNum, Integer.parseInt(record.value()), 0);
+                }
+            }
+        }
+    }
 
     @Bean
     public void initCentralServer() {
@@ -47,6 +61,9 @@ public class CentralServer {
         // INITIALIZING 5 rooms values to 0 everything. 
         sharedMemory.initializeHashMap(5);
         kafkaService = new KafkaService();
+        kafkaService.initCentralServerConsumer();
+        Thread listenThread = new Thread(this::listenForCurrentTemp);
+        listenThread.start();
 
 
         // Add shutdown hook to close server sockets
@@ -140,7 +157,7 @@ class SharedMemory {
         mutex.lock();
         try {
             for (int roomNumber = 1; roomNumber <= maxRoomNumber; roomNumber++) {
-                roomTemp.put(roomNumber, new int[]{0, 0});
+                roomTemp.put(roomNumber, new int[]{0, 100});
             }
         } finally {
             mutex.unlock();

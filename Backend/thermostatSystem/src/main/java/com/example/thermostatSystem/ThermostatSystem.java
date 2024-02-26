@@ -22,7 +22,7 @@ public class ThermostatSystem {
         this.roomId = roomId;
         currentTemp = (int) ((Math.random() * (MAX_TEMP - MIN_TEMP)) + MIN_TEMP);
         kafka = new KafkaService(this.roomId);
-        kafka.initConsumer(LISTENER_PARTITION);
+        kafka.initThermostatConsumer(LISTENER_PARTITION);
         startFluctuationThread();
         sendTempChangeMessage();
         Thread listenThread = new Thread(this::listenForChangeTemp);
@@ -68,11 +68,6 @@ public class ThermostatSystem {
         fluctuationThread.start();
     }
 
-
-    public int getCurrentTemp() {
-        return currentTemp;
-    }
-
     public void changeTemp(int new_temperature) {
         isChangingTemperature = true;
         log.info("Temperature change begin for " + roomId);
@@ -108,31 +103,4 @@ public class ThermostatSystem {
         });
         changeTempThread.start();
     }
-
-
-
-    // public static void main(String[] args) {
-    //     ThermostatSystem thermostat1 = new ThermostatSystem(22.0f);
-
-    //     // Check temperature
-    //     for (int i = 0; i < 10; i++) {
-    //         System.out.println("Current temperature: " + thermostat1.getCurrentTemp()); 
-    //         try {
-    //             Thread.sleep(1000);
-    //         } catch (InterruptedException e) {
-    //             e.printStackTrace();
-    //         }
-    //     }
-
-    //     // Change temperature
-    //     thermostat1.changeTemp(25.0f);
-    //     while(thermostat1.getCurrentTemp() < 25.0f) {
-    //         System.out.println("Current temperature: " + thermostat1.getCurrentTemp()); 
-    //         try {
-    //             Thread.sleep(1000);
-    //         } catch (InterruptedException e) {
-    //             e.printStackTrace();
-    //         }
-    //     }
-    // }
 }
