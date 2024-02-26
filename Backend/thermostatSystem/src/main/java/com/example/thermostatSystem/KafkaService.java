@@ -1,22 +1,27 @@
 package com.example.thermostatSystem;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Properties;
 
+@Configuration
 public class KafkaService {
 
     private KafkaConsumer<String, String> consumer;
     private KafkaProducer<String, String> producer;
     private String roomTopic;
+
+    @Value("${kafka.number-of-rooms}")
+    private int numberOfRooms = 5;
 
     public KafkaService(String roomTopic){
         consumer = setKafkaConsumer();
@@ -46,7 +51,18 @@ public class KafkaService {
         return consumer.poll(Duration.ofMillis(100));
     }
 
-    public void initConsumer(int partition){
+    public void initCentralServerConsumer(){
+        Collection<TopicPartition> partitions = new ArrayList<>();
+
+        for(int roomNum = 1; roomNum <= numberOfRooms; roomNum++){
+            System.out.println("assigning room"+ roomNum);
+            partitions.add(new TopicPartition("room" + roomNum, 1));
+        }
+        System.out.println("Assigned");
+        consumer.assign(partitions);
+    }
+
+    public void initThermostatConsumer(int partition){
         Collection<TopicPartition> partitions = new ArrayList<>();
         partitions.add(new TopicPartition(this.roomTopic, partition));
         System.out.println("Assigning");
