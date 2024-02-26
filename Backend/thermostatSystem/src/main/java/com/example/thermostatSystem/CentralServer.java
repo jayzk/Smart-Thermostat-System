@@ -33,11 +33,14 @@ public class CentralServer {
     @Value("${central-server.ports}")
     private int[] SERVER_PORT;
 
+    @Value("${kafka.number-of-rooms}")
+    private int numberOfRooms;
+
     private static ExecutorService executor;
     private static List<ServerSocket> serverSockets;
     private static SharedMemory sharedMemory;
 
-    private KafkaService kafkaService = new KafkaService();
+    private KafkaService kafkaService;
 
     public void listenForCurrentTemp(){
         while (true){
@@ -58,9 +61,9 @@ public class CentralServer {
         executor = Executors.newFixedThreadPool(NUM_SERVERS);
         serverSockets = new ArrayList<>();
         sharedMemory = new SharedMemory();
-        // INITIALIZING 5 rooms values to 0 everything. 
-        sharedMemory.initializeHashMap(5);
-        kafkaService = new KafkaService();
+        // INITIALIZING 5 rooms values to 0 everything.
+        sharedMemory.initializeHashMap(numberOfRooms);
+        kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
         Thread listenThread = new Thread(this::listenForCurrentTemp);
         listenThread.start();
