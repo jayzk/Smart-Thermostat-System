@@ -9,7 +9,9 @@ function RoomPage() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch(`http://localhost:8080/currentTemp?roomNum=${roomNum}`);
+      const response = await fetch(
+        `http://localhost:8080/currentTemp?roomNum=${roomNum}`
+      );
       const jsonData = await response.json();
       setCurrentTemp(jsonData);
 
@@ -55,9 +57,12 @@ function RoomPage() {
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
       });
+
+      alert("Temperature has been set");
   };
 
   return (
+    
     <div class="container my-5 d-flex flex-column align-items-center justify-content-center align-middle">
       <div class="card w-50 my-2">
         <div class="card-body">
@@ -91,6 +96,7 @@ function RoomPage() {
               type="increment"
               class="btn btn-primary mx-2"
               onClick={incrementDesiredTemp}
+              id="setTempNotify"
             >
               Increase temperature
             </button>
