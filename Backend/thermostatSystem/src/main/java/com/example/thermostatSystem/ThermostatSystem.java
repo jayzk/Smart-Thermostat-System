@@ -3,7 +3,6 @@ package com.example.thermostatSystem;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
-import java.util.Random;
 import java.util.logging.Logger;
 
 public class ThermostatSystem {
@@ -15,7 +14,6 @@ public class ThermostatSystem {
     final int LISTENER_PARTITION = 0;
     final int SENDER_PARTITION = 1;
 
-    boolean isChangingTemperature = false;
     private static final Logger log = Logger.getLogger(ThermostatSystem.class.getName());
 
     public ThermostatSystem(String roomId) {
@@ -23,7 +21,6 @@ public class ThermostatSystem {
         currentTemp = (int) ((Math.random() * (MAX_TEMP - MIN_TEMP)) + MIN_TEMP);
         kafka = new KafkaService(this.roomId);
         kafka.initThermostatConsumer(LISTENER_PARTITION);
-        startFluctuationThread();
         sendTempChangeMessage();
         Thread listenThread = new Thread(this::listenForChangeTemp);
         listenThread.start();
@@ -50,26 +47,8 @@ public class ThermostatSystem {
         kafka.produce(SENDER_PARTITION, currentTemp);
     }
 
-    private void startFluctuationThread() {
-        Thread fluctuationThread = new Thread(() -> {
-            Random r = new Random();
-            while (true) {
-                if (!isChangingTemperature) {
-                    int randomChange = (int) (Math.round((r.nextDouble() * 2 - 1) * 10.0) / 10.0);
-                    currentTemp += randomChange;
-                }
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        fluctuationThread.start();
-    }
 
     public void changeTemp(int new_temperature) {
-        isChangingTemperature = true;
         log.info("Temperature change begin for " + roomId);
         log.info("Current temp is: "  + currentTemp);
         Thread changeTempThread = new Thread(() -> {
@@ -99,7 +78,6 @@ public class ThermostatSystem {
                 }
             }
             log.info("Temperature change complete");
-            isChangingTemperature = false;
         });
         changeTempThread.start();
     }

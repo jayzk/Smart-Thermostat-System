@@ -5,23 +5,20 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
+
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Properties;
 
-@Configuration
 public class KafkaService {
 
     private KafkaConsumer<String, String> consumer;
     private KafkaProducer<String, String> producer;
     private String roomTopic;
 
-    @Value("${kafka.number-of-rooms}")
-    private int numberOfRooms = 5;
+    private int numberOfRooms;
 
     public KafkaService(String roomTopic){
         consumer = setKafkaConsumer();
@@ -29,9 +26,10 @@ public class KafkaService {
         this.roomTopic = roomTopic;
     }
 
-    public KafkaService(){
+    public KafkaService(int numberOfRooms){
         consumer = setKafkaConsumer();
         producer = setKafkaProducer();
+        this.numberOfRooms = numberOfRooms;
     }
 
     public void setRoomTopic(String roomTopic){
@@ -54,7 +52,7 @@ public class KafkaService {
     public void initCentralServerConsumer(){
         Collection<TopicPartition> partitions = new ArrayList<>();
 
-        for(int roomNum = 1; roomNum <= numberOfRooms; roomNum++){
+        for(int roomNum = 1; roomNum <= this.numberOfRooms; roomNum++){
             System.out.println("assigning room"+ roomNum);
             partitions.add(new TopicPartition("room" + roomNum, 1));
         }
@@ -83,7 +81,7 @@ public class KafkaService {
         props.setProperty("auto.commit.interval.ms", "1000");
         props.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.setProperty("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        props.setProperty("auto.offset.reset", "latest");
+        props.setProperty("auto.offset.reset", "earliest");
         return new KafkaConsumer<>(props);
     }
 
