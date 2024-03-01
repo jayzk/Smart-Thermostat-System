@@ -14,6 +14,8 @@ public class ThermostatSystem {
     final int LISTENER_PARTITION = 0;
     final int SENDER_PARTITION = 1;
 
+    Thread changeTempThread = new Thread();
+
     private static final Logger log = Logger.getLogger(ThermostatSystem.class.getName());
 
     public ThermostatSystem(String roomId) {
@@ -37,7 +39,11 @@ public class ThermostatSystem {
                 }
                 if(lastRecord!=null){
                     int newTemp = Integer.parseInt(lastRecord.value());
-                    changeTemp(newTemp);
+                    if(this.changeTempThread.isAlive()){
+                        this.changeTempThread.interrupt();
+                    }
+                    this.changeTempThread = new Thread(() -> changeTemp(newTemp));
+                    this.changeTempThread.start();
                 }
             }
         }
@@ -51,34 +57,32 @@ public class ThermostatSystem {
     public void changeTemp(int new_temperature) {
         log.info("Temperature change begin for " + roomId);
         log.info("Current temp is: "  + currentTemp);
-        Thread changeTempThread = new Thread(() -> {
-            if (currentTemp < new_temperature) {
-                while (currentTemp < new_temperature) {
-                    currentTemp += 1;
-                    sendTempChangeMessage();
-                    log.info("Increased - for room: " + roomId);
-                    log.info("Now it is: " + currentTemp);
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } else if (currentTemp > new_temperature) {
-                while (currentTemp > new_temperature) {
-                    currentTemp -= 1;
-                    sendTempChangeMessage();
-                    log.info("Decreased - for room: " + roomId);
-                    log.info("Now it is: " + currentTemp);
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+        if (currentTemp < new_temperature) {
+            while (currentTemp < new_temperature) {
+                currentTemp += 1;
+                sendTempChangeMessage();
+                log.info("Increased - for room: " + roomId);
+                log.info("Now it is: " + currentTemp);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    break;
                 }
             }
-            log.info("Temperature change complete");
-        });
-        changeTempThread.start();
+        } else if (currentTemp > new_temperature) {
+            while (currentTemp > new_temperature) {
+                currentTemp -= 1;
+                sendTempChangeMessage();
+                log.info("Decreased - for room: " + roomId);
+                log.info("Now it is: " + currentTemp);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }
+
+        log.info("Temperature change complete");
     }
 }
