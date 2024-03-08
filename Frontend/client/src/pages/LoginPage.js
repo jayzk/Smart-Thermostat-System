@@ -10,8 +10,13 @@ function LoginPage() {
 
   let navigate = useNavigate();
   const login = () => {
-    let path = `/room/${roomNum}`;
+    if(roomNum <= 0) {
+      alert("Room number does not exist!");
+    }
+    else {
+      let path = `/room/${roomNum}`;
     navigate(path);
+    }
   };
 
   return (
