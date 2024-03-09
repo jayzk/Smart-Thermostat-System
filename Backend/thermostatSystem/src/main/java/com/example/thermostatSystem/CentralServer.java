@@ -186,6 +186,7 @@ class ClientHandler extends Thread {
     public void run() {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
             String instruction;
 
             while ((instruction = reader.readLine()) != null) {
@@ -197,13 +198,12 @@ class ClientHandler extends Thread {
 
                 if (type == 0){
                     //Check current temperature
-                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
                     int[] currentTemperature = sharedMemory.readInstructions(room);
 
                     writer.write(Integer.toString(currentTemperature[0]) + "\n");
                     writer.flush();
                 }
-                else{
+                else if (type == 1){
                     int temperature = roomTempJson.getInt("temperature");
                     //Change temperature
                     // Extract room and temperature values
@@ -211,6 +211,11 @@ class ClientHandler extends Thread {
                     sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
                     kafkaService.setRoomTopic("room" + room);
                     kafkaService.produce(0, temperature);
+                }
+                else if (instruction.equals("check alive")){
+                    // Return if replica is alive
+                    writer.write("Alive\n");
+                    writer.flush();
                 }
             }
         } catch (IOException e) {
