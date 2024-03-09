@@ -1,10 +1,11 @@
 package com.example.thermostatSystem;
 
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 import org.json.JSONObject;
 
 
@@ -32,21 +33,40 @@ public class CentralServer {
     @Value("${central-server.ports}")
     private int[] SERVER_PORT;
 
+    @Value("${kafka.number-of-rooms}")
+    private int numberOfRooms;
+
     private static ExecutorService executor;
     private static List<ServerSocket> serverSockets;
     private static SharedMemory sharedMemory;
 
     private KafkaService kafkaService;
 
+    public void listenForCurrentTemp(){
+        while (true){
+            ConsumerRecords<String, String> records = kafkaService.consume();
+            if(!records.isEmpty()){
+                for (ConsumerRecord<String, String> record : records){
+                    String topic = record.topic();
+                    String numberStr = topic.substring("room".length());
+                    int roomNum = Integer.parseInt(numberStr);
+                    sharedMemory.writeInstructions(roomNum, Integer.parseInt(record.value()), 0);
+                }
+            }
+        }
+    }
 
     @Bean
     public void initCentralServer() {
         executor = Executors.newFixedThreadPool(NUM_SERVERS);
         serverSockets = new ArrayList<>();
         sharedMemory = new SharedMemory();
-        // INITIALIZING 5 rooms values to 0 everything. 
-        sharedMemory.initializeHashMap(5);
-        kafkaService = new KafkaService();
+        // INITIALIZING 5 rooms values to 0 everything.
+        sharedMemory.initializeHashMap(numberOfRooms);
+        kafkaService = new KafkaService(numberOfRooms);
+        kafkaService.initCentralServerConsumer();
+        Thread listenThread = new Thread(this::listenForCurrentTemp);
+        listenThread.start();
 
 
         // Add shutdown hook to close server sockets
@@ -140,7 +160,7 @@ class SharedMemory {
         mutex.lock();
         try {
             for (int roomNumber = 1; roomNumber <= maxRoomNumber; roomNumber++) {
-                roomTemp.put(roomNumber, new int[]{0, 0});
+                roomTemp.put(roomNumber, new int[]{0, 100});
             }
         } finally {
             mutex.unlock();
@@ -169,9 +189,7 @@ class ClientHandler extends Thread {
             String instruction;
 
             while ((instruction = reader.readLine()) != null) {
-                //sharedMemory.writeInstructions(instruction);
                 JSONObject roomTempJson = new JSONObject(instruction);
-                System.out.println(roomTempJson.get("room"));
 
                 int type = roomTempJson.getInt("type");
                 int room = roomTempJson.getInt("room");
@@ -180,10 +198,10 @@ class ClientHandler extends Thread {
                 if (type == 0){
                     //Check current temperature
                     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-                    int[] currentTemperature = sharedMemory.readInstructions(room); 
-                    writer.write(currentTemperature.toString());
+                    int[] currentTemperature = sharedMemory.readInstructions(room);
+
+                    writer.write(Integer.toString(currentTemperature[0]) + "\n");
                     writer.flush();
-                    writer.close();
                 }
                 else{
                     int temperature = roomTempJson.getInt("temperature");
@@ -194,7 +212,6 @@ class ClientHandler extends Thread {
                     kafkaService.setRoomTopic("room" + room);
                     kafkaService.produce(0, temperature);
                 }
-                // System.out.println("Instruction received from client and written to shared memory: " + instruction);
             }
         } catch (IOException e) {
             e.printStackTrace();

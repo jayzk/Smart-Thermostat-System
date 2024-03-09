@@ -1,11 +1,11 @@
 package com.example.thermostatSystem;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -18,15 +18,18 @@ public class KafkaService {
     private KafkaProducer<String, String> producer;
     private String roomTopic;
 
+    private int numberOfRooms;
+
     public KafkaService(String roomTopic){
         consumer = setKafkaConsumer();
         producer = setKafkaProducer();
         this.roomTopic = roomTopic;
     }
 
-    public KafkaService(){
+    public KafkaService(int numberOfRooms){
         consumer = setKafkaConsumer();
         producer = setKafkaProducer();
+        this.numberOfRooms = numberOfRooms;
     }
 
     public void setRoomTopic(String roomTopic){
@@ -46,7 +49,18 @@ public class KafkaService {
         return consumer.poll(Duration.ofMillis(100));
     }
 
-    public void initConsumer(int partition){
+    public void initCentralServerConsumer(){
+        Collection<TopicPartition> partitions = new ArrayList<>();
+
+        for(int roomNum = 1; roomNum <= this.numberOfRooms; roomNum++){
+            System.out.println("assigning room"+ roomNum);
+            partitions.add(new TopicPartition("room" + roomNum, 1));
+        }
+        System.out.println("Assigned");
+        consumer.assign(partitions);
+    }
+
+    public void initThermostatConsumer(int partition){
         Collection<TopicPartition> partitions = new ArrayList<>();
         partitions.add(new TopicPartition(this.roomTopic, partition));
         System.out.println("Assigning");
@@ -67,7 +81,7 @@ public class KafkaService {
         props.setProperty("auto.commit.interval.ms", "1000");
         props.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.setProperty("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        props.setProperty("auto.offset.reset", "latest");
+        props.setProperty("auto.offset.reset", "earliest");
         return new KafkaConsumer<>(props);
     }
 
