@@ -1,6 +1,6 @@
 package backend.Thermostats;
 
-import backend.KafkaService;
+import backend.Kafka.KafkaService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 

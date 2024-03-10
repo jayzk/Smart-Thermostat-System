@@ -1,5 +1,6 @@
-package backend.Thermostats;
+package backend.Kafka;
 
+import backend.Thermostats.ThermostatSystem;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Logger;
 
 @Component
 public class TopicCreator {
@@ -19,6 +21,7 @@ public class TopicCreator {
 
     @Bean
     public CommandLineRunner createTopics() {
+        final Logger log = Logger.getLogger(TopicCreator.class.getName());
         return args -> {
             // Kafka bootstrap server
             String bootstrapServers = "localhost:9092";
@@ -38,7 +41,7 @@ public class TopicCreator {
                     // Check if the topic already exists
                     String topicName = "room" + roomNum;
                     if (adminClient.listTopics().names().get().contains(topicName)) {
-                        System.out.println("Topic " + topicName + " already exists. Skipping.");
+                        log.info("Topic " + topicName + " already exists. Skipping.");
                         continue;
                     }
 
@@ -48,7 +51,7 @@ public class TopicCreator {
                     // Add topic creation request to a list
                     adminClient.createTopics(Collections.singletonList(newTopic));
 
-                    System.out.println("Topic " + topicName + " created successfully.");
+                    log.info("Topic " + topicName + " created successfully.");
                 }
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();

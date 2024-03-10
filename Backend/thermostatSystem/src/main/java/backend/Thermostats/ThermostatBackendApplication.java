@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 public class ThermostatBackendApplication {
 
 	public static void main(String[] args) {
-		int port = 8081;
+		int port = 12000;
 		SpringApplication.run(ThermostatBackendApplication.class, "--server.port=" + port);
 	}
 

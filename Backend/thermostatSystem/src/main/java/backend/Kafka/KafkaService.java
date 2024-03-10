@@ -1,4 +1,4 @@
-package backend;
+package backend.Kafka;
 
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
