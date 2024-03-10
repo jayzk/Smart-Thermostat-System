@@ -1,4 +1,4 @@
-package com.example.thermostatSystem;
+package backend.Proxy;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,5 +1,6 @@
-package com.example.thermostatSystem;
+package backend.Thermostats;
 
+import com.example.thermostatSystem.KafkaService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 

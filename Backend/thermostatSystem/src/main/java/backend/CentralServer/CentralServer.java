@@ -1,6 +1,7 @@
-package com.example.thermostatSystem;
+package backend.CentralServer;
 
 
+import com.example.thermostatSystem.KafkaService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Value;
