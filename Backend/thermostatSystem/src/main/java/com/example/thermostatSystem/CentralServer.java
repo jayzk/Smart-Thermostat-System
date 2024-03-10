@@ -212,7 +212,7 @@ class ClientHandler extends Thread {
                     kafkaService.setRoomTopic("room" + room);
                     kafkaService.produce(0, temperature);
                 }
-                else if (instruction.equals("check alive")){
+                else if (type == 2){
                     // Return if replica is alive
                     writer.write("Alive\n");
                     writer.flush();
