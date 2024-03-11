@@ -1,6 +1,5 @@
-package backend.Kafka;
+package backend.Proxy;
 
-import backend.Thermostats.ThermostatSystem;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;

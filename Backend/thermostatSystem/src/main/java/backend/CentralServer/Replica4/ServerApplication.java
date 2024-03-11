@@ -1,9 +1,8 @@
-package backend.CentralServer.Replica3;
+package backend.CentralServer.Replica4;
 
 
 import backend.CentralServer.SharedMemory;
 import backend.Kafka.KafkaService;
-import backend.Kafka.TopicCreator;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.json.JSONObject;
@@ -15,7 +14,6 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,7 +21,7 @@ import java.util.logging.Logger;
 
 
 @Component
-public class CentralServer {
+public class ServerApplication {
     @Value("${kafka.number-of-rooms}")
     private int numberOfRooms;
 
@@ -33,7 +31,7 @@ public class CentralServer {
 
     private KafkaService kafkaService;
 
-    @Value("${replica3.listenerPort}")
+    @Value("${replica4.listenerPort}")
     private int port;
 
 
@@ -54,7 +52,7 @@ public class CentralServer {
 
     @Bean
     public void initCentralServer() {
-        final Logger log = Logger.getLogger(backend.CentralServer.Replica3.CentralServer.class.getName());
+        final Logger log = Logger.getLogger(ServerApplication.class.getName());
         kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
         executor = Executors.newFixedThreadPool(1);

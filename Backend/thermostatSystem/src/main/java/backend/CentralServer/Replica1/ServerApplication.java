@@ -1,9 +1,8 @@
-package backend.CentralServer.Replica2;
+package backend.CentralServer.Replica1;
 
 
 import backend.CentralServer.SharedMemory;
 import backend.Kafka.KafkaService;
-import backend.Kafka.TopicCreator;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.json.JSONObject;
@@ -15,7 +14,6 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,7 +21,7 @@ import java.util.logging.Logger;
 
 
 @Component
-public class CentralServer {
+public class ServerApplication {
     @Value("${kafka.number-of-rooms}")
     private int numberOfRooms;
 
@@ -33,8 +31,10 @@ public class CentralServer {
 
     private KafkaService kafkaService;
 
-    @Value("${replica2.listenerPort}")
+    @Value("${replica1.listenerPort}")
     private int port;
+
+    private Logger log;
 
 
     public void listenForCurrentTemp(){
@@ -42,7 +42,7 @@ public class CentralServer {
             ConsumerRecords<String, String> records = kafkaService.consume();
             if(!records.isEmpty()){
                 for (ConsumerRecord<String, String> record : records){
-                    System.out.println("Received this from thermostat: " +  record.topic() +" "+ record.value());
+                    log.info("Received this from thermostat: " +  record.topic() +" "+ record.value());
                     String topic = record.topic();
                     String numberStr = topic.substring("room".length());
                     int roomNum = Integer.parseInt(numberStr);
@@ -54,7 +54,7 @@ public class CentralServer {
 
     @Bean
     public void initCentralServer() {
-        final Logger log = Logger.getLogger(backend.CentralServer.Replica2.CentralServer.class.getName());
+        log = Logger.getLogger(ServerApplication.class.getName());
         kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
         executor = Executors.newFixedThreadPool(1);
@@ -111,62 +111,62 @@ public class CentralServer {
 
 
 
-    class ClientHandler extends Thread {
-        private final Socket clientSocket;
-        private final SharedMemory sharedMemory;
-        private KafkaService kafkaService;
-        final Logger log;
+class ClientHandler extends Thread {
+    private final Socket clientSocket;
+    private final SharedMemory sharedMemory;
+    private KafkaService kafkaService;
+    final Logger log;
 
-        public ClientHandler(Logger log, Socket socket, SharedMemory sharedMemory) {
-            this.clientSocket = socket;
-            this.log = log;
-            this.sharedMemory = sharedMemory;
-        }
+    public ClientHandler(Logger log, Socket socket, SharedMemory sharedMemory) {
+        this.clientSocket = socket;
+        this.log = log;
+        this.sharedMemory = sharedMemory;
+    }
 
-        public void setKafkaService(KafkaService service){
-            this.kafkaService = service;
-        }
+    public void setKafkaService(KafkaService service){
+        this.kafkaService = service;
+    }
 
-        public void run() {
-            try {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-                String instruction;
+    public void run() {
+        try {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+            String instruction;
 
-                while ((instruction = reader.readLine()) != null) {
-                    JSONObject roomTempJson = new JSONObject(instruction);
+            while ((instruction = reader.readLine()) != null) {
+                JSONObject roomTempJson = new JSONObject(instruction);
 
-                    int type = roomTempJson.getInt("type");
-                    int room = roomTempJson.getInt("room");
+                int type = roomTempJson.getInt("type");
+                int room = roomTempJson.getInt("room");
 
 
-                    if (type == 0){
-                        //Check current temperature
-                        int[] currentTemperature = sharedMemory.readInstructions(room);
-                        log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
-                        writer.write(Integer.toString(currentTemperature[0]) + "\n");
-                        writer.flush();
-                    }
-                    else if (type == 1){
-                        int temperature = roomTempJson.getInt("temperature");
-                        //Change temperature
-                        // Extract room and temperature values
-                        int[] currentTemperature = sharedMemory.readInstructions(room);
-                        sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
-                        kafkaService.setRoomTopic("room" + room);
-                        kafkaService.produce(0, temperature);
-                        log.info("Received a change temperature request for room: " + room + " value: " + temperature);
-                    }
-                    else if (type == 2){
-                        log.info("Received an Alive message");
-                        // Return if replica is alive
-                        writer.write("Alive\n");
-                        writer.flush();
-                    }
+                if (type == 0){
+                    //Check current temperature
+                    int[] currentTemperature = sharedMemory.readInstructions(room);
+                    log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
+                    writer.write(Integer.toString(currentTemperature[0]) + "\n");
+                    writer.flush();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
+                else if (type == 1){
+                    int temperature = roomTempJson.getInt("temperature");
+                    //Change temperature
+                    // Extract room and temperature values
+                    int[] currentTemperature = sharedMemory.readInstructions(room);
+                    sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
+                    kafkaService.setRoomTopic("room" + room);
+                    kafkaService.produce(0, temperature);
+                    log.info("Received a change temperature request for room: " + room + " value: " + temperature);
+                }
+                else if (type == 2){
+                    log.info("Received an Alive message");
+                    // Return if replica is alive
+                    writer.write("Alive\n");
+                    writer.flush();
+                }
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
+}
 }
