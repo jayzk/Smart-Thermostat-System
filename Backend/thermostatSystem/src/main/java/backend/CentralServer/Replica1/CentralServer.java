@@ -15,6 +15,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,7 +54,7 @@ public class CentralServer {
 
     @Bean
     public void initCentralServer() {
-        final Logger log = Logger.getLogger(TopicCreator.class.getName());
+        final Logger log = Logger.getLogger(backend.CentralServer.Replica1.CentralServer.class.getName());
         kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
         executor = Executors.newFixedThreadPool(1);
@@ -94,7 +95,7 @@ public class CentralServer {
                         Socket clientSocket = serverSocket.accept();
                         log.info("Client connected to port " + this.port);
                         // Handle the client connection (e.g., create a new thread to handle it)
-                        ClientHandler clientHandler = new ClientHandler(clientSocket, sharedMemory);
+                        ClientHandler clientHandler = new ClientHandler(log, clientSocket, sharedMemory);
                         clientHandler.setKafkaService(kafkaService);
                         clientHandler.start();
                     }
@@ -114,9 +115,11 @@ class ClientHandler extends Thread {
     private final Socket clientSocket;
     private final SharedMemory sharedMemory;
     private KafkaService kafkaService;
+    final Logger log;
 
-    public ClientHandler(Socket socket, SharedMemory sharedMemory) {
+    public ClientHandler(Logger log, Socket socket, SharedMemory sharedMemory) {
         this.clientSocket = socket;
+        this.log = log;
         this.sharedMemory = sharedMemory;
     }
 
@@ -140,7 +143,7 @@ class ClientHandler extends Thread {
                 if (type == 0){
                     //Check current temperature
                     int[] currentTemperature = sharedMemory.readInstructions(room);
-
+                    log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
                     writer.write(Integer.toString(currentTemperature[0]) + "\n");
                     writer.flush();
                 }
@@ -152,8 +155,10 @@ class ClientHandler extends Thread {
                     sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
                     kafkaService.setRoomTopic("room" + room);
                     kafkaService.produce(0, temperature);
+                    log.info("Received a change temperature request for room: " + room + " value: " + temperature);
                 }
                 else if (type == 2){
+                    log.info("Received an Alive message");
                     // Return if replica is alive
                     writer.write("Alive\n");
                     writer.flush();

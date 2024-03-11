@@ -15,6 +15,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,7 +54,7 @@ public class CentralServer {
 
     @Bean
     public void initCentralServer() {
-        final Logger log = Logger.getLogger(TopicCreator.class.getName());
+        final Logger log = Logger.getLogger(backend.CentralServer.Replica4.CentralServer.class.getName());
         kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
         executor = Executors.newFixedThreadPool(1);
@@ -94,7 +95,7 @@ public class CentralServer {
                         Socket clientSocket = serverSocket.accept();
                         log.info("Client connected to port " + this.port);
                         // Handle the client connection (e.g., create a new thread to handle it)
-                        ClientHandler clientHandler = new ClientHandler(clientSocket, sharedMemory);
+                        ClientHandler clientHandler = new ClientHandler(log, clientSocket, sharedMemory);
                         clientHandler.setKafkaService(kafkaService);
                         clientHandler.start();
                     }
@@ -114,9 +115,11 @@ public class CentralServer {
         private final Socket clientSocket;
         private final SharedMemory sharedMemory;
         private KafkaService kafkaService;
+        final Logger log;
 
-        public ClientHandler(Socket socket, SharedMemory sharedMemory) {
+        public ClientHandler(Logger log, Socket socket, SharedMemory sharedMemory) {
             this.clientSocket = socket;
+            this.log = log;
             this.sharedMemory = sharedMemory;
         }
 
@@ -127,6 +130,7 @@ public class CentralServer {
         public void run() {
             try {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
                 String instruction;
 
                 while ((instruction = reader.readLine()) != null) {
@@ -138,13 +142,12 @@ public class CentralServer {
 
                     if (type == 0){
                         //Check current temperature
-                        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
                         int[] currentTemperature = sharedMemory.readInstructions(room);
-
+                        log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
                         writer.write(Integer.toString(currentTemperature[0]) + "\n");
                         writer.flush();
                     }
-                    else{
+                    else if (type == 1){
                         int temperature = roomTempJson.getInt("temperature");
                         //Change temperature
                         // Extract room and temperature values
@@ -152,6 +155,13 @@ public class CentralServer {
                         sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
                         kafkaService.setRoomTopic("room" + room);
                         kafkaService.produce(0, temperature);
+                        log.info("Received a change temperature request for room: " + room + " value: " + temperature);
+                    }
+                    else if (type == 2){
+                        log.info("Received an Alive message");
+                        // Return if replica is alive
+                        writer.write("Alive\n");
+                        writer.flush();
                     }
                 }
             } catch (IOException e) {
