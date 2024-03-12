@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 //import { useParams } from "react-router";
 import { useParams } from "react-router-dom";
 
 function RoomPage() {
   const [desiredTemp, setDesiredTemp] = useState(20);
-  const [currentTemp, setCurrentTemp] = useState(22);
+  const [currentTemp, setCurrentTemp] = useState(null);
   let { roomNum } = useParams();
 
   const fetchData = async () => {
@@ -20,6 +20,11 @@ function RoomPage() {
       console.error("Error fetching data:", error);
     }
   };
+
+  useEffect(() => {
+    // Fetch data when the component mounts
+    fetchData();
+  }, []); // Empty dependency array to ensure the effect runs only once on component mount
 
   // Function to increment desired temperature
   const incrementDesiredTemp = () => {
