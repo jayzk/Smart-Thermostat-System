@@ -1,14 +1,10 @@
-package backend.CentralServer.Replica1;
+package backend.CentralServer;
 
 
-import backend.CentralServer.SharedMemory;
 import backend.Kafka.KafkaService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -20,21 +16,26 @@ import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 
 
-@Component
 public class ServerApplication {
-    @Value("${kafka.number-of-rooms}")
-    private int numberOfRooms;
+    private final int numberOfRooms;
 
     private static ExecutorService executor;
     private static List<ServerSocket> serverSockets;
-    private static SharedMemory sharedMemory;
+    private static ReplicatedMemory replicatedMemory;
 
     private KafkaService kafkaService;
 
-    @Value("${replica1.listenerPort}")
-    private int port;
+    private final int port;
 
-    private Logger log;
+    private final Logger log;
+
+    public ServerApplication(int numberOfRooms, int port){
+        log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + port);
+        this.numberOfRooms = numberOfRooms;
+        this.port = port;
+        System.out.println("This one port: " + this.port);
+        initCentralServer();
+    }
 
 
     public void listenForCurrentTemp(){
@@ -46,21 +47,19 @@ public class ServerApplication {
                     String topic = record.topic();
                     String numberStr = topic.substring("room".length());
                     int roomNum = Integer.parseInt(numberStr);
-                    sharedMemory.writeInstructions(roomNum, Integer.parseInt(record.value()), 0);
+                    replicatedMemory.writeInstructions(roomNum, Integer.parseInt(record.value()), 0);
                 }
             }
         }
     }
 
-    @Bean
     public void initCentralServer() {
-        log = Logger.getLogger(ServerApplication.class.getName());
         kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
         executor = Executors.newFixedThreadPool(1);
         serverSockets = new ArrayList<>();
-        sharedMemory = new SharedMemory();
-        sharedMemory.initializeHashMap(numberOfRooms);
+        replicatedMemory = new ReplicatedMemory();
+        replicatedMemory.initializeHashMap(numberOfRooms);
         Thread listenThread = new Thread(this::listenForCurrentTemp);
         listenThread.start();
 
@@ -80,7 +79,7 @@ public class ServerApplication {
             //
             // int roomNum = 0;
             System.out.println("Contents of shared memory:");
-            sharedMemory.printHashMap();
+            replicatedMemory.printHashMap();
             System.out.println("Shutdown complete.");
         }));
 
@@ -91,11 +90,8 @@ public class ServerApplication {
                 try (ServerSocket serverSocket = new ServerSocket(this.port)) {
                     log.info("Server listening on port " + this.port);
                     while (true) {
-                        // Accept client connections and handle them
                         Socket clientSocket = serverSocket.accept();
-                        log.info("Client connected to port " + this.port);
-                        // Handle the client connection (e.g., create a new thread to handle it)
-                        ClientHandler clientHandler = new ClientHandler(log, clientSocket, sharedMemory);
+                        ClientHandler clientHandler = new ClientHandler(log, clientSocket, replicatedMemory);
                         clientHandler.setKafkaService(kafkaService);
                         clientHandler.start();
                     }
@@ -113,14 +109,14 @@ public class ServerApplication {
 
 class ClientHandler extends Thread {
     private final Socket clientSocket;
-    private final SharedMemory sharedMemory;
+    private final ReplicatedMemory replicatedMemory;
     private KafkaService kafkaService;
     final Logger log;
 
-    public ClientHandler(Logger log, Socket socket, SharedMemory sharedMemory) {
+    public ClientHandler(Logger log, Socket socket, ReplicatedMemory replicatedMemory) {
         this.clientSocket = socket;
         this.log = log;
-        this.sharedMemory = sharedMemory;
+        this.replicatedMemory = replicatedMemory;
     }
 
     public void setKafkaService(KafkaService service){
@@ -142,7 +138,7 @@ class ClientHandler extends Thread {
 
                 if (type == 0){
                     //Check current temperature
-                    int[] currentTemperature = sharedMemory.readInstructions(room);
+                    int[] currentTemperature = replicatedMemory.readInstructions(room);
                     log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
                     writer.write(Integer.toString(currentTemperature[0]) + "\n");
                     writer.flush();
@@ -151,8 +147,8 @@ class ClientHandler extends Thread {
                     int temperature = roomTempJson.getInt("temperature");
                     //Change temperature
                     // Extract room and temperature values
-                    int[] currentTemperature = sharedMemory.readInstructions(room);
-                    sharedMemory.writeInstructions(room, currentTemperature[0], temperature);
+                    int[] currentTemperature = replicatedMemory.readInstructions(room);
+                    replicatedMemory.writeInstructions(room, currentTemperature[0], temperature);
                     kafkaService.setRoomTopic("room" + room);
                     kafkaService.produce(0, temperature);
                     log.info("Received a change temperature request for room: " + room + " value: " + temperature);

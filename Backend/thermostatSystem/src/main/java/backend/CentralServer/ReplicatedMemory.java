@@ -5,11 +5,11 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class SharedMemory {
+public class ReplicatedMemory {
     private Map<Integer, int[]> roomTemp;
     private final Lock mutex;
 
-    public SharedMemory() {
+    public ReplicatedMemory() {
         this.roomTemp = new HashMap<>();
         this.mutex = new ReentrantLock();
     }
