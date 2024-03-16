@@ -22,6 +22,8 @@ public class ProxyServer {
         this.serverPorts = new ArrayList<Integer>();
         this.serverPorts.add(10000);
         this.serverPorts.add(10001);
+        this.serverPorts.add(10002);
+        this.serverPorts.add(10003);
         this.loadIndex = 0;
     }
 
@@ -36,7 +38,7 @@ public class ProxyServer {
 
         String[] arrOfStr = requestBody.split(",");
         String checkMessage = "{ \"type\": 2," + arrOfStr[1] + "}";
-        System.out.println("Checking message: " + checkMessage);
+        // System.out.println("Checking message: " + checkMessage);
         
         // Get avalible server ports
         ArrayList<Integer> avalibleServerPorts = checkAvalible(checkMessage);
@@ -61,6 +63,7 @@ public class ProxyServer {
                 PrintWriter out = new PrintWriter(outputStream, true);
 
                 // Send request to the server
+                System.out.println("Send changing temperature request to port: " + centralServerPort);
                 out.println(requestBody);
 
 
@@ -81,8 +84,8 @@ public class ProxyServer {
     public ArrayList<Integer> checkAvalible(String checkMessage){
         ArrayList<Integer> avalibleServerPorts = new ArrayList<Integer>();
         // Check avaliable ports
-        try {
-            for(int i = 0; i < serverPorts.size(); i++){
+        for(int i = 0; i < serverPorts.size(); i++){
+            try {
                 String respond = "";
                 Socket socket = new Socket(centralServerAddress, serverPorts.get(i));
                 System.out.println("Check replica Alive: replica port " + serverPorts.get(i));
@@ -98,7 +101,7 @@ public class ProxyServer {
                 InputStream inputStream = socket.getInputStream();
                 BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
                 respond = in.readLine();
-                System.out.println("Respond: " + respond);
+                // System.out.println("Respond: " + respond);
                 if(respond.equals("Alive")){
                     avalibleServerPorts.add(serverPorts.get(i));
                     System.out.println("Port " + serverPorts.get(i) + " is alive.");
@@ -106,9 +109,9 @@ public class ProxyServer {
                 out.close();
                 in.close();
                 socket.close();
+            } catch (IOException e) {
+                System.out.println("Port " + serverPorts.get(i) + " is not alive.");
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
         return avalibleServerPorts;
     }
@@ -126,7 +129,7 @@ public class ProxyServer {
 
         // Get avalible server ports
         String checkMessage= "{ \"type\": 2, \"room\":" + roomNum + "}";
-        System.out.println("Checking message: " + checkMessage);
+        // System.out.println("Checking message: " + checkMessage);
         ArrayList<Integer> avalibleServerPorts = checkAvalible(checkMessage);
 
         // Find the port post request
@@ -148,6 +151,7 @@ public class ProxyServer {
             OutputStream outputStream = socket.getOutputStream();
             PrintWriter out = new PrintWriter(outputStream, true);
 
+            System.out.println("Send checking temperature request to port: " + centralServerPort);
             String data= "{ \"type\": 0, \"room\":" + roomNum + "}";
             out.println(data);
 
@@ -160,7 +164,6 @@ public class ProxyServer {
             in.close();
             socket.close();
 
-            System.out.println("Sockets closed!");
         } catch (IOException e) {
             e.printStackTrace();
         }
