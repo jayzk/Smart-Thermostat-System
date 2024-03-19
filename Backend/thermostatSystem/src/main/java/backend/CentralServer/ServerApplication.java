@@ -7,8 +7,10 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.json.JSONObject;
 
 import java.io.*;
+import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -26,8 +28,8 @@ public class ServerApplication {
     private KafkaService kafkaService;
 
     private final int proxyPort;
-    private final int syncPort;
-    private int currLeader;
+    private final int syncPort; //acts as an ID for the bully algorithm
+    private int currLeader = 10501;
     private int[] knownReplicas = new int[]{10500, 10501, 10502, 10503};
 
     private final Logger log;
@@ -39,8 +41,77 @@ public class ServerApplication {
         this.syncPort = syncPort;
         System.out.println("This one port: " + this.proxyPort);
         initCentralServer();
+
+        System.out.println("leader status alive?: " + checkLeaderAlive());
     }
 
+    public void sendBully(int port) {
+        sendMessage(port, "BULLY");
+    }
+
+    public void sendElection(int port) {
+        sendMessage(port, "ELECTION");
+    }
+
+    public void sendLeader(int port) {
+        sendMessage(port, "LEADER");
+    }
+
+    private void sendMessage(int port, String message) {
+        try (Socket socket = new Socket("localhost", port);
+             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
+            writer.println(message);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean checkLeaderAlive() {
+        if(currLeader > 0 && currLeader != syncPort) {
+            try (Socket socket = new Socket("localhost", currLeader)) {
+                sendMessage(currLeader, "{\"type\": 0}");
+                socket.setSoTimeout(1000);
+                return true;
+            } catch (SocketTimeoutException | ConnectException e) {
+                return false;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        else if(currLeader == syncPort) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void recieveLeaderCheck() {
+        try (Socket socket = new Socket("localhost", syncPort)) {
+            socket.
+            socket.setSoTimeout(1000);
+            return true;
+        } catch (SocketTimeoutException | ConnectException e) {
+            return false;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+//    public void sendElection(List<Server> servers) {
+//        System.out.println("Server " + syncPort + " is initiating an election");
+//        for (Server server : servers) {
+//            if (server.getId() > syncPort) {
+//                try {
+//                    server.receiveElection(id);
+//                } catch (Exception e) {
+//                    // Handle unreachable server
+//                    e.printStackTrace();
+//                }
+//            }
+//        }
+//        setLeader(true);
+//        System.out.println("Server " + id + " becomes the coordinator");
+//    }
 
     public void listenForCurrentTemp(){
         while (true){
