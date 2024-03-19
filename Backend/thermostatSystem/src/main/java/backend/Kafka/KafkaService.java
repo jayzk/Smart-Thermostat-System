@@ -1,4 +1,4 @@
-package com.example.thermostatSystem;
+package backend.Kafka;
 
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.UUID;
 
 public class KafkaService {
 
@@ -53,17 +54,14 @@ public class KafkaService {
         Collection<TopicPartition> partitions = new ArrayList<>();
 
         for(int roomNum = 1; roomNum <= this.numberOfRooms; roomNum++){
-            System.out.println("assigning room"+ roomNum);
             partitions.add(new TopicPartition("room" + roomNum, 1));
         }
-        System.out.println("Assigned");
         consumer.assign(partitions);
     }
 
     public void initThermostatConsumer(int partition){
         Collection<TopicPartition> partitions = new ArrayList<>();
         partitions.add(new TopicPartition(this.roomTopic, partition));
-        System.out.println("Assigning");
         consumer.assign(partitions);
     }
 
@@ -76,7 +74,8 @@ public class KafkaService {
     private KafkaConsumer<String, String> setKafkaConsumer() {
         Properties props = new Properties();
         props.setProperty("bootstrap.servers", "localhost:9092");
-        props.setProperty("group.id", "test");
+        props.setProperty("group.id", "same");
+        props.setProperty("client.id", "consumer-same-" + UUID.randomUUID());
         props.setProperty("enable.auto.commit", "true");
         props.setProperty("auto.commit.interval.ms", "1000");
         props.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
