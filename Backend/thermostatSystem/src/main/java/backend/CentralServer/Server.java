@@ -1,6 +1,5 @@
 package backend.CentralServer;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -9,19 +8,18 @@ import java.util.logging.Logger;
 @Component
 public class Server {
     private int id;
-    private boolean coordinator; //TODO: should the coordinator be the proxy???
+    private boolean isLeader; //TODO: should the coordinator be the proxy???
     private final int port;
     private final Logger log;
 
     private int numberOfRooms;
 
     // Constructor, getters, and setters
-
-    public Server(int port, int id, boolean isCoordinator) {
+    public Server(int port, int id, boolean isLeader) {
         this.port = port;
         this.log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + port);
         this.id = id;
-        this.coordinator = isCoordinator;
+        this.isLeader = isLeader;
     }
 
     public void initiateElection(List<Server> servers) {
@@ -36,7 +34,7 @@ public class Server {
                 }
             }
         }
-        setCoordinator(true);
+        setLeader(true);
         System.out.println("Server " + id + " becomes the coordinator");
     }
 
@@ -61,11 +59,11 @@ public class Server {
         this.id = id;
     }
 
-    public boolean isCoordinator() {
-        return coordinator;
+    public boolean isLeader() {
+        return isLeader;
     }
 
-    public void setCoordinator(boolean coordinator) {
-        this.coordinator = coordinator;
+    public void setLeader(boolean leader) {
+        this.isLeader = leader;
     }
 }
