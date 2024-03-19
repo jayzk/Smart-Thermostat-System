@@ -25,15 +25,19 @@ public class ServerApplication {
 
     private KafkaService kafkaService;
 
-    private final int port;
+    private final int proxyPort;
+    private final int syncPort;
+    private int currLeader;
+    private int[] knownReplicas = new int[]{10500, 10501, 10502, 10503};
 
     private final Logger log;
 
-    public ServerApplication(int numberOfRooms, int port){
-        log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + port);
+    public ServerApplication(int numberOfRooms, int proxyPort, int syncPort){
+        log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + proxyPort);
         this.numberOfRooms = numberOfRooms;
-        this.port = port;
-        System.out.println("This one port: " + this.port);
+        this.proxyPort = proxyPort;
+        this.syncPort = syncPort;
+        System.out.println("This one port: " + this.proxyPort);
         initCentralServer();
     }
 
@@ -87,8 +91,8 @@ public class ServerApplication {
         try {
             new Thread(() -> {
 
-                try (ServerSocket serverSocket = new ServerSocket(this.port)) {
-                    log.info("Server listening on port " + this.port);
+                try (ServerSocket serverSocket = new ServerSocket(this.proxyPort)) {
+                    log.info("Server listening on port " + this.proxyPort);
                     while (true) {
                         Socket clientSocket = serverSocket.accept();
                         ClientHandler clientHandler = new ClientHandler(log, clientSocket, replicatedMemory);
@@ -96,7 +100,7 @@ public class ServerApplication {
                         clientHandler.start();
                     }
                 } catch (Exception e) {
-                    log.warning("Exception occurred on port " + this.port + ": " + e.getMessage());
+                    log.warning("Exception occurred on port " + this.proxyPort + ": " + e.getMessage());
                 }
             }).start();
         } catch (Exception e) {
