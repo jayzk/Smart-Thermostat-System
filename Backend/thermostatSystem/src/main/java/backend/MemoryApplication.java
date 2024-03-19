@@ -40,15 +40,15 @@ public class MemoryApplication {
 
                 if (type == 0){
                     //Check current temperature
-                    int roomTemp = getTemperature(room);
-                    writer.write(roomTemp);
+                    writer.write(getTemperature(room));
                     writer.flush();
+                    printRoomTemperatures(roomTemp);
                 }
                 else if (type == 1){
                     //Change temperature
                     int temperature = roomTempJson.getInt("temperature");
                     addTemperature(room, temperature);
-                    
+                    printRoomTemperatures(roomTemp);
                 }
             }
                 } catch (IOException e) {
@@ -63,6 +63,13 @@ public class MemoryApplication {
 
     public int getTemperature(Integer roomId) {
         return roomTemp.getOrDefault(roomId, 0);
+    }
+
+    public void printRoomTemperatures(Map<Integer, Integer> map) {
+        System.out.println("Room Temperatures:");
+        for (Map.Entry<Integer, Integer> entry : map.entrySet()) {
+            System.out.println("Room " + entry.getKey() + ": " + entry.getValue());
+        }
     }
 
     public static void main(String[] args) {
