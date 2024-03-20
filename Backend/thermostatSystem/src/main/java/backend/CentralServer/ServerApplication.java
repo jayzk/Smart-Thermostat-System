@@ -464,6 +464,35 @@ public class ServerApplication {
         initCentralServer();
         receiveMessage();
         initiateElection();
+        checkAlive();
+    }
+
+    public void checkAlive(){
+        new Thread(() -> {
+            while (true) {
+                if (currLeader != syncPort) {
+                    try (Socket socket = new Socket()) {
+                        // Timeout for connection attempt (in milliseconds)
+                        int timeout = 2000; // Adjust as needed
+
+                        // Attempt to connect to the server
+                        log.info("Checking if leader, " + currLeader + " is alive");
+                        socket.connect(new InetSocketAddress("localhost", currLeader), timeout);
+                        log.info("Leader " + currLeader + " is alive");
+                        // Connection successful, server is alive
+                    } catch (IOException e) {
+                        log.info("Leader " + currLeader + " is dead");
+                        // Connection failed, server is not alive
+                        initiateElection();
+                    }
+                    try {
+                        Thread.sleep(2000); // Sleep for 2 seconds before next check
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
     }
 
 
@@ -544,6 +573,7 @@ public class ServerApplication {
                     if(serverPort != syncPort){
                         String message = "{ \"type\": \"Leader\", \"portVal\":" + syncPort + "}";
                         sendOneMessage(serverPort, message);
+                        running = false;
                     }
                 }
             }
@@ -572,11 +602,11 @@ public class ServerApplication {
                 System.out.println("Server started. Listening for messages...");
 
                 while (true) {
-                    log.info("serverSocketClosed: " + serverSocket.isClosed());
-                    log.info("Server listening on port " + syncPort);
+//                    log.info("serverSocketClosed: " + serverSocket.isClosed());
+//                    log.info("Server listening on port " + syncPort);
                     Socket clientSocket = serverSocket.accept();
-                    log.info("clientSocket: " + clientSocket.isClosed());
-                    log.info("Client connected: " + clientSocket.getInetAddress() + clientSocket.getPort());
+//                    log.info("clientSocket: " + clientSocket.isClosed());
+//                    log.info("Client connected: " + clientSocket.getInetAddress() + clientSocket.getPort());
                     // Read messages from the client continuously
 
                     new Thread(() -> {
