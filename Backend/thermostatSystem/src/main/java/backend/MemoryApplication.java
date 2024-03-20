@@ -23,7 +23,9 @@ public class MemoryApplication {
     }
 
     public void startListening() {
+
         System.out.println("Listening on port " + port + "...");
+        while (true){
         try (ServerSocket serverSocket = new ServerSocket(this.port)) {
             Socket servSocket = serverSocket.accept();
             System.out.println("Listening for data on port " + this.port + "...");
@@ -32,6 +34,8 @@ public class MemoryApplication {
             String instruction;
             
             while ((instruction = reader.readLine()) != null) {
+                // instruction = reader.readLine();
+                // if (instruction != null){
                 JSONObject roomTempJson = new JSONObject(instruction);
 
                 int type = roomTempJson.getInt("type");
@@ -50,15 +54,22 @@ public class MemoryApplication {
                     addTemperature(room, temperature);
                     printRoomTemperatures(roomTemp);
                 }
-            }
+            
+        }
                 } catch (IOException e) {
                     System.out.println("Exception recieved: " + e.getMessage());
                 }
         }
-        
+    }
 
     public void addTemperature(Integer roomId, Integer temperature) {
         roomTemp.put(roomId, temperature);
+    }
+    public void initializeHashMap(int maxRoomNumber) {
+        for (int roomNumber = 1; roomNumber <= maxRoomNumber; roomNumber++) {
+            roomTemp.put(roomNumber, 0);
+        }
+        
     }
 
     public int getTemperature(Integer roomId) {
@@ -74,7 +85,7 @@ public class MemoryApplication {
 
     public static void main(String[] args) {
 
-        int port = 12000;
+        int port = 12005;
 
         if (args.length > 0) {
             try {

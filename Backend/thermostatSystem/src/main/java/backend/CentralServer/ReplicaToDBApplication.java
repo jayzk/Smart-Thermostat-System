@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import org.springframework.web.bind.annotation.RequestBody;
 
 public class ReplicaToDBApplication{
+
+    ReplicaToDBApplication(){}
     
     // Send request to database and update the data 
     public void updateData(int roomID, int temp) {
@@ -47,7 +49,8 @@ public class ReplicaToDBApplication{
     }
 
     // Get tempurature from data base
-    public void getTemp(int roomID) {
+    public int getTemp(int roomID) {
+        int intValue = 0 ;
         
         String centralServerAddress = "127.0.0.1";
         System.out.println("Get temperature from roomID: " + roomID);
@@ -75,11 +78,14 @@ public class ReplicaToDBApplication{
                 out.close();
                 in.close();
                 socket.close();
-                break;
+                intValue = Integer.parseInt(respond);
+                // return intValue;
             
             } catch (IOException e) {
                 System.out.println("Get temp request data port " + port + " is not avalible.");
             }
         }
+        // intValue = Integer.parseInt(respond);
+        return intValue;
     }
 }
