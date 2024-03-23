@@ -27,7 +27,7 @@ public class ServerApplication {
     private final int syncPort; //acts as an ID for the bully algorithm
     private int currLeader = 0;
     private int[] knownReplicas = new int[]{10500, 10501, 10502, 10503};
-    private int[] db_ports = new int[]{12000, 12001, 12003, 12004};
+    private int[] db_ports = new int[]{12000, 12001, 12002, 12003};
     private ClientHandler clientHandler;
 
     private final Logger log;
@@ -52,6 +52,7 @@ public class ServerApplication {
                 if (currLeader != syncPort) {
                     try (Socket socket = new Socket()) {
                         // Timeout for connection attempt (in milliseconds)
+                        socket.setSoTimeout(1000);
                         int timeout = 2000;
 
                         log.info("Checking if leader, " + currLeader + " is alive");
