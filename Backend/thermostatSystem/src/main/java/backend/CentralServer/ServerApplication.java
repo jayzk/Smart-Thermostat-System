@@ -332,11 +332,14 @@ public class ServerApplication {
                     // Create input stream to receive response
                     InputStream inputStream = socket.getInputStream();
                     BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                    Thread.sleep(10);
                     out.close();
                     in.close();
                     socket.close();
                 } catch (IOException e) {
                     log.info("Update data port " + port + " is not available.");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
             }
         }
