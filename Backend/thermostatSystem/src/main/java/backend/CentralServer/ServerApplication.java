@@ -116,34 +116,12 @@ public class ServerApplication {
     }
 
     public void initiateElection() {
-        running = true;
-        log.info("Server " + syncPort + " is initiating an election");
-        int maxPort = Arrays.stream(knownReplicas).max().getAsInt();
-        if (maxPort == syncPort) {
-            currLeader = syncPort;
-            for (int serverPort : knownReplicas) {
-                if (serverPort != syncPort) {
-                    String message = "{ \"type\": \"Leader\", \"portVal\":" + syncPort + "}";
-                    sendOneMessage(serverPort, message);
-                    running = false;
-                }
-            }
-        } else {
-            String response = "";
-            for (int serverPort : knownReplicas) {
-                if (serverPort > syncPort) {
-                    String message = "{ \"type\": \"Election\", \"portVal\":" + syncPort + "}";
-                    response = sendMessage(serverPort, message);
-                }
-            }
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            if (response.isEmpty()) {
+        new Thread(() -> {
+            running = true;
+            log.info("Server " + syncPort + " is initiating an election");
+            int maxPort = Arrays.stream(knownReplicas).max().getAsInt();
+            if (maxPort == syncPort) {
                 currLeader = syncPort;
-                log.info("-------CURRENT LEADER:--------" + currLeader);
                 for (int serverPort : knownReplicas) {
                     if (serverPort != syncPort) {
                         String message = "{ \"type\": \"Leader\", \"portVal\":" + syncPort + "}";
@@ -152,21 +130,44 @@ public class ServerApplication {
                     }
                 }
             } else {
-                try {
-                    Thread.sleep(10000);
-                    if (currLeader == 0) {
-                        initiateElection();
-                    } else {
-                        running = false;
+                String response = "";
+                for (int serverPort : knownReplicas) {
+                    if (serverPort > syncPort) {
+                        String message = "{ \"type\": \"Election\", \"portVal\":" + syncPort + "}";
+                        response = sendMessage(serverPort, message);
                     }
+                }
+                try {
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
+                if (response.isEmpty()) {
+                    currLeader = syncPort;
+                    log.info("-------CURRENT LEADER:--------" + currLeader);
+                    for (int serverPort : knownReplicas) {
+                        if (serverPort != syncPort) {
+                            String message = "{ \"type\": \"Leader\", \"portVal\":" + syncPort + "}";
+                            sendOneMessage(serverPort, message);
+                            running = false;
+                        }
+                    }
+                } else {
+                    try {
+                        Thread.sleep(10000);
+                        if (currLeader == 0) {
+                            initiateElection();
+                        } else {
+                            running = false;
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
 
+                }
             }
-        }
+        }).start();
     }
-
 
     private void receiveMessage() {
         Thread receiverThread = new Thread(() -> {
