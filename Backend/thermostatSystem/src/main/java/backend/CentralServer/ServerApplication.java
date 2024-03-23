@@ -19,7 +19,6 @@ public class ServerApplication {
 
     private static ExecutorService executor;
     private static List<ServerSocket> serverSockets;
-    private static ReplicatedMemory replicatedMemory;
     private boolean running = false;
 
     private KafkaService kafkaService;
