@@ -235,7 +235,41 @@ public class ServerApplication {
                     String numberStr = topic.substring("room".length());
                     int roomNum = Integer.parseInt(numberStr);
                     replicatedMemory.writeInstructions(roomNum, Integer.parseInt(record.value()), 0);
+                    updateData(roomNum, Integer.parseInt(record.value()));
+
                 }
+            }
+        }
+    }
+
+    public void updateData(int roomID, int temp) {
+
+        String centralServerAddress = "127.0.0.1";
+        System.out.println("Update roomID: " + roomID + " temp: " + temp);
+
+        for(int port = 12005; port < 12006; port++){
+            try {
+                // Create a socket connection to the central server
+                Socket socket = new Socket(centralServerAddress, port);
+
+                // Create output stream to send request
+                OutputStream outputStream = socket.getOutputStream();
+                PrintWriter out = new PrintWriter(outputStream, true);
+
+                // Send request to the JAVA DB
+                System.out.println("Send update request to port: " + port);
+                String updateMassage= "{ \"type\": 1, \"room\":" + roomID + ", \"temperature\":" + temp + "}";
+                out.println(updateMassage);
+
+
+                // Create input stream to receive response
+                InputStream inputStream = socket.getInputStream();
+                BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                out.close();
+                in.close();
+                socket.close();
+            } catch (IOException e) {
+                System.out.println("Update data port " + port + " is not avalible.");
             }
         }
     }
@@ -247,6 +281,7 @@ public class ServerApplication {
         serverSockets = new ArrayList<>();
         replicatedMemory = new ReplicatedMemory();
         replicatedMemory.initializeHashMap(numberOfRooms);
+
         Thread listenThread = new Thread(this::listenForCurrentTemp);
         listenThread.start();
 
@@ -310,6 +345,79 @@ public class ServerApplication {
             this.kafkaService = service;
         }
 
+        public void updateData(int roomID, int temp) {
+
+            String centralServerAddress = "127.0.0.1";
+            System.out.println("Update roomID: " + roomID + " temp: " + temp);
+
+            for(int port = 12005; port < 12006; port++){
+                try {
+                    // Create a socket connection to the central server
+                    Socket socket = new Socket(centralServerAddress, port);
+
+                    // Create output stream to send request
+                    OutputStream outputStream = socket.getOutputStream();
+                    PrintWriter out = new PrintWriter(outputStream, true);
+
+                    // Send request to the JAVA DB
+                    System.out.println("Send update request to port: " + port);
+                    String updateMassage= "{ \"type\": 1, \"room\":" + roomID + ", \"temperature\":" + temp + "}";
+                    out.println(updateMassage);
+
+
+                    // Create input stream to receive response
+                    InputStream inputStream = socket.getInputStream();
+                    BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                    out.close();
+                    in.close();
+                    socket.close();
+                } catch (IOException e) {
+                    System.out.println("Update data port " + port + " is not avalible.");
+                }
+            }
+        }
+
+        // Get tempurature from data base
+        public int getTemp(int roomID) {
+            int intValue = 0 ;
+
+            String centralServerAddress = "127.0.0.1";
+            System.out.println("Get temperature from roomID: " + roomID);
+
+            for(int port = 12005; port < 12006; port++){
+                try {
+                    // Create a socket connection to the central server
+                    Socket socket = new Socket(centralServerAddress, port);
+
+                    // Create output stream to send request
+                    OutputStream outputStream = socket.getOutputStream();
+                    PrintWriter out = new PrintWriter(outputStream, true);
+
+                    // Send request to the JAVA DB
+                    System.out.println("Send get temp request to port: " + port);
+                    String getTempMassage= "{ \"type\": 0, \"room\":" + roomID + "}";
+                    out.println(getTempMassage);
+
+
+                    // Create input stream to receive response
+                    InputStream inputStream = socket.getInputStream();
+                    BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                    String respond = in.readLine();
+                    System.out.println("Get tempurature Respond: " + respond);
+                    out.close();
+                    in.close();
+                    socket.close();
+                    intValue = Integer.parseInt(respond);
+                    // return intValue;
+
+                } catch (IOException e) {
+                    System.out.println("Get temp request data port " + port + " is not avalible.");
+                }
+            }
+            // intValue = Integer.parseInt(respond);
+            return intValue;
+        }
+
         public void run() {
             try {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -320,22 +428,22 @@ public class ServerApplication {
                     JSONObject roomTempJson = new JSONObject(instruction);
 
                     int type = roomTempJson.getInt("type");
+                    int room = roomTempJson.getInt("room");
 
 
                     if (type == 0){
-                        int room = roomTempJson.getInt("room");
                         //Check current temperature
                         int[] currentTemperature = replicatedMemory.readInstructions(room);
                         log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
-                        writer.write(Integer.toString(currentTemperature[0]) + "\n");
+                        writer.write(Integer.toString(getTemp(room)) + "\n");
                         writer.flush();
                     }
                     else if (type == 1){
-                        int room = roomTempJson.getInt("room");
                         int temperature = roomTempJson.getInt("temperature");
                         //Change temperature
                         // Extract room and temperature values
                         int[] currentTemperature = replicatedMemory.readInstructions(room);
+                        updateData(room, temperature);
                         replicatedMemory.writeInstructions(room, currentTemperature[0], temperature);
                         kafkaService.setRoomTopic("room" + room);
                         kafkaService.produce(0, temperature);
@@ -354,3 +462,34 @@ public class ServerApplication {
         }
     }
 }
+
+//                if (type == 0){
+//                    //Check current temperature
+//                    int[] currentTemperature = replicatedMemory.readInstructions(room);
+//                    log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
+//                    writer.write(Integer.toString(getTemp(room)) + "\n");
+//                    writer.flush();
+//                }
+//                else if (type == 1){
+//                    int temperature = roomTempJson.getInt("temperature");
+//                    //Change temperature
+//                    // Extract room and temperature values
+//                    int[] currentTemperature = replicatedMemory.readInstructions(room);
+//                    updateData(room, temperature);
+//                    replicatedMemory.writeInstructions(room, currentTemperature[0], temperature);
+//                    kafkaService.setRoomTopic("room" + room);
+//                    kafkaService.produce(0, temperature);
+//                    log.info("Received a change temperature request for room: " + room + " value: " + temperature);
+//                }
+//                else if (type == 2){
+//                    log.info("Received an Alive message");
+//                    // Return if replica is alive
+//                    writer.write("Alive\n");
+//                    writer.flush();
+//                }
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
+//}
