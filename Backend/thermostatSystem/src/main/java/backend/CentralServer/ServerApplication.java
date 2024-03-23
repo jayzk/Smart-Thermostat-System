@@ -234,7 +234,6 @@ public class ServerApplication {
                     String topic = record.topic();
                     String numberStr = topic.substring("room".length());
                     int roomNum = Integer.parseInt(numberStr);
-                    replicatedMemory.writeInstructions(roomNum, Integer.parseInt(record.value()), 0);
                     clientHandler.updateData(roomNum, Integer.parseInt(record.value()));
                 }
             }
@@ -247,8 +246,6 @@ public class ServerApplication {
         kafkaService.initCentralServerConsumer();
         executor = Executors.newFixedThreadPool(1);
         serverSockets = new ArrayList<>();
-        replicatedMemory = new ReplicatedMemory();
-        replicatedMemory.initializeHashMap(numberOfRooms);
 
         Thread listenThread = new Thread(this::listenForCurrentTemp);
         listenThread.start();
@@ -269,7 +266,6 @@ public class ServerApplication {
             //
             // int roomNum = 0;
             log.info("Contents of shared memory:");
-            replicatedMemory.printHashMap();
             log.info("Shutdown complete.");
         }));
 
@@ -400,17 +396,13 @@ public class ServerApplication {
 
                     if (type == 0) {
                         //Check current temperature
-                        int[] currentTemperature = replicatedMemory.readInstructions(room);
-                        log.info("Received a current temperature request for room: " + room + " value: " + currentTemperature[0]);
                         writer.write(Integer.toString(getTemp(room)) + "\n");
                         writer.flush();
                     } else if (type == 1) {
                         int temperature = roomTempJson.getInt("temperature");
                         //Change temperature
                         // Extract room and temperature values
-                        int[] currentTemperature = replicatedMemory.readInstructions(room);
                         updateData(room, temperature);
-                        replicatedMemory.writeInstructions(room, currentTemperature[0], temperature);
                         kafkaService.setRoomTopic("room" + room);
                         kafkaService.produce(0, temperature);
                         log.info("Received a change temperature request for room: " + room + " value: " + temperature);

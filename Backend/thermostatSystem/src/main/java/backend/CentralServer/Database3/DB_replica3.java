@@ -1,12 +1,14 @@
 package backend.CentralServer.Database3;
 
-import backend.CentralServer.Database1.DB_replica1;
-import backend.CentralServer.Database2.DB_replica2;
 import backend.CentralServer.MemoryApplication;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
+@SpringBootApplication
+@EnableWebMvc
 public class DB_replica3 {
     public static void main(String[] args) {
         int applicationPort = 12502;

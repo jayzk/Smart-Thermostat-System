@@ -1,6 +1,5 @@
 package backend.CentralServer.Database2;
 
-import backend.CentralServer.Database1.DB_replica1;
 import backend.CentralServer.MemoryApplication;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
