@@ -10,7 +10,6 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -22,14 +21,16 @@ public class ServerApplication {
     private static List<ServerSocket> serverSockets;
     private boolean running = false;
 
+    private boolean iHaveLock = true;
+
     private KafkaService kafkaService;
 
     private final int proxyPort;
-    private final int syncPort; //acts as an ID for the bully algorithm
+    private final int electionPort; //acts as an ID for the bully algorithm
     private int currLeader = 0;
-    private int[] knownReplicas = new int[]{10500, 10501, 10502, 10503};
-    private int[] db_ports = new int[]{12000, 12001, 12002, 12003};
-    private ClientHandler clientHandler;
+    private final int[] allElectionPorts = new int[]{10500, 10501, 10502, 10503};
+    private final int[] db_ports = new int[]{12000, 12001, 12002, 12003};
+    private final ClientHandler clientHandler;
 
     private final Logger log;
 
@@ -37,7 +38,7 @@ public class ServerApplication {
         log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + proxyPort);
         this.numberOfRooms = numberOfRooms;
         this.proxyPort = proxyPort;
-        this.syncPort = syncPort;
+        this.electionPort = syncPort;
         this.clientHandler = new ClientHandler(log);
         this.clientHandler.setKafkaService(kafkaService);
         log.info("This one port: " + this.proxyPort);
@@ -50,7 +51,7 @@ public class ServerApplication {
     public void checkAlive() {
         new Thread(() -> {
             while (true) {
-                if (currLeader != syncPort && currLeader > 0) {
+                if (currLeader != electionPort && currLeader > 0) {
                     try (Socket socket = new Socket()) {
                         // Timeout for connection attempt (in milliseconds)
                         socket.setSoTimeout(1000);
@@ -119,22 +120,22 @@ public class ServerApplication {
     public void initiateElection() {
         new Thread(() -> {
             running = true;
-            log.info("Server " + syncPort + " is initiating an election");
-            int maxPort = Arrays.stream(knownReplicas).max().getAsInt();
-            if (maxPort == syncPort) {
-                currLeader = syncPort;
-                for (int serverPort : knownReplicas) {
-                    if (serverPort != syncPort) {
-                        String message = "{ \"type\": \"Leader\", \"portVal\":" + syncPort + "}";
+            log.info("Server " + electionPort + " is initiating an election");
+            int maxPort = Arrays.stream(allElectionPorts).max().getAsInt();
+            if (maxPort == electionPort) {
+                currLeader = electionPort;
+                for (int serverPort : allElectionPorts) {
+                    if (serverPort != electionPort) {
+                        String message = "{ \"type\": \"Leader\", \"portVal\":" + electionPort + "}";
                         sendOneMessage(serverPort, message);
                         running = false;
                     }
                 }
             } else {
                 String response = "";
-                for (int serverPort : knownReplicas) {
-                    if (serverPort > syncPort) {
-                        String message = "{ \"type\": \"Election\", \"portVal\":" + syncPort + "}";
+                for (int serverPort : allElectionPorts) {
+                    if (serverPort > electionPort) {
+                        String message = "{ \"type\": \"Election\", \"portVal\":" + electionPort + "}";
                         response = sendMessage(serverPort, message);
                         if(response.equals("Bully")){
                             log.info("Got bullied");
@@ -143,11 +144,11 @@ public class ServerApplication {
                     }
                 }
                 if (response.isEmpty()) {
-                    currLeader = syncPort;
+                    currLeader = electionPort;
                     log.info("-------CURRENT LEADER:--------" + currLeader);
-                    for (int serverPort : knownReplicas) {
-                        if (serverPort != syncPort) {
-                            String message = "{ \"type\": \"Leader\", \"portVal\":" + syncPort + "}";
+                    for (int serverPort : allElectionPorts) {
+                        if (serverPort != electionPort) {
+                            String message = "{ \"type\": \"Leader\", \"portVal\":" + electionPort + "}";
                             sendOneMessage(serverPort, message);
                             running = false;
                         }
@@ -174,7 +175,7 @@ public class ServerApplication {
     private void receiveMessage() {
         Thread receiverThread = new Thread(() -> {
             try {
-                ServerSocket serverSocket = new ServerSocket(syncPort);
+                ServerSocket serverSocket = new ServerSocket(electionPort);
                 log.info("Server started. Listening for messages...");
 
                 while (true) {
@@ -195,7 +196,7 @@ public class ServerApplication {
                                     running = false;
                                 }
                                 case "Election" -> {
-                                    if (messageJson.getInt("portVal") < syncPort) {
+                                    if (messageJson.getInt("portVal") < electionPort) {
                                         // Write code here to send a "Bully" message back to the client with the same port
                                         JSONObject responseJson = new JSONObject();
                                         String responseString = "Bully\n";
@@ -307,37 +308,43 @@ public class ServerApplication {
         }
 
         public void updateData(int roomID, int temp) {
+            while (true){
+                if(iHaveLock){
+                    String centralServerAddress = "127.0.0.1";
+                    log.info("Update roomID: " + roomID + " temp: " + temp);
 
-            String centralServerAddress = "127.0.0.1";
-            log.info("Update roomID: " + roomID + " temp: " + temp);
+                    for (int port : db_ports) {
+                        try {
+                            // Create a socket connection to the central server
+                            Socket socket = new Socket(centralServerAddress, port);
 
-            for (int port : db_ports) {
-                try {
-                    // Create a socket connection to the central server
-                    Socket socket = new Socket(centralServerAddress, port);
+                            // Create output stream to send request
+                            OutputStream outputStream = socket.getOutputStream();
+                            PrintWriter out = new PrintWriter(outputStream, true);
 
-                    // Create output stream to send request
-                    OutputStream outputStream = socket.getOutputStream();
-                    PrintWriter out = new PrintWriter(outputStream, true);
+                            // Send request to the JAVA DB
+                            log.info("Send update request to port: " + port);
+                            String updateMassage = "{ \"type\": 1, \"room\":" + roomID + ", \"temperature\":" + temp + "}";
+                            out.println(updateMassage);
 
-                    // Send request to the JAVA DB
-                    log.info("Send update request to port: " + port);
-                    String updateMassage = "{ \"type\": 1, \"room\":" + roomID + ", \"temperature\":" + temp + "}";
-                    out.println(updateMassage);
-
-                    // Create input stream to receive response
-                    InputStream inputStream = socket.getInputStream();
-                    BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-                    Thread.sleep(10);
-                    out.close();
-                    in.close();
-                    socket.close();
-                } catch (IOException e) {
-                    log.info("Update data port " + port + " is not available.");
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                            // Create input stream to receive response
+                            InputStream inputStream = socket.getInputStream();
+                            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                            Thread.sleep(10);
+                            out.close();
+                            in.close();
+                            socket.close();
+                        } catch (IOException e) {
+                            log.info("Update data port " + port + " is not available.");
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    break;
                 }
+
             }
+
         }
 
         public int getTemp(int roomID) {
