@@ -10,6 +10,7 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -42,8 +43,8 @@ public class ServerApplication {
         log.info("This one port: " + this.proxyPort);
         initCentralServer();
         receiveMessage();
-        initiateElection();
         checkAlive();
+        initiateElection();
     }
 
     public void checkAlive() {
@@ -55,9 +56,9 @@ public class ServerApplication {
                         socket.setSoTimeout(1000);
                         int timeout = 2000;
 
-                        log.info("Checking if leader, " + currLeader + " is alive");
+//                        log.info("Checking if leader, " + currLeader + " is alive");
                         socket.connect(new InetSocketAddress("localhost", currLeader), timeout);
-                        log.info("Leader " + currLeader + " is alive");
+//                        log.info("Leader " + currLeader + " is alive");
                     } catch (IOException e) {
                         log.info("Leader " + currLeader + " is dead");
                         initiateElection();
@@ -135,12 +136,10 @@ public class ServerApplication {
                     if (serverPort > syncPort) {
                         String message = "{ \"type\": \"Election\", \"portVal\":" + syncPort + "}";
                         response = sendMessage(serverPort, message);
+                        if(Objects.equals(response, "Bully")){
+                            break;
+                        }
                     }
-                }
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
                 }
                 if (response.isEmpty()) {
                     currLeader = syncPort;
@@ -156,8 +155,10 @@ public class ServerApplication {
                     try {
                         Thread.sleep(10000);
                         if (currLeader == 0) {
+                            log.info("Re-initiate election" + response);
                             initiateElection();
                         } else {
+                            log.info("No need to re-run, leader elected");
                             running = false;
                         }
                     } catch (InterruptedException e) {
