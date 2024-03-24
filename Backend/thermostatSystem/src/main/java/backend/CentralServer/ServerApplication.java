@@ -19,7 +19,7 @@ public class ServerApplication {
     private static List<ServerSocket> serverSockets;
     private boolean running = false;
 
-    private boolean iHaveLock = false; //TODO: change this to false
+    private boolean iHaveLock = true; //TODO: change this to false
 
     private KafkaService kafkaService;
 
@@ -472,7 +472,7 @@ public class ServerApplication {
             while (true){ //TODO: do we need this while loop???
                 log.info("SYNC TEST");
                 //request permission to enter CS from leader
-                sendEnterCS(syncPort);
+                //sendEnterCS(syncPort);
                 if(iHaveLock){ //enter CS
                     String centralServerAddress = "127.0.0.1";
                     log.info("Update roomID: " + roomID + " temp: " + temp);
@@ -506,7 +506,7 @@ public class ServerApplication {
                         }
                     }
                     //exit out of CS
-                    sendExitCS(syncPort);
+                    //sendExitCS(syncPort);
                     break;
                 }
 
