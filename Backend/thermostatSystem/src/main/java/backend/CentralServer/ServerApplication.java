@@ -50,15 +50,15 @@ public class ServerApplication {
     public void checkAlive() {
         new Thread(() -> {
             while (true) {
-                if (currLeader != syncPort) {
+                if (currLeader != syncPort && currLeader > 0) {
                     try (Socket socket = new Socket()) {
                         // Timeout for connection attempt (in milliseconds)
                         socket.setSoTimeout(1000);
                         int timeout = 2000;
 
-//                        log.info("Checking if leader, " + currLeader + " is alive");
+                        log.info("Checking if leader, " + currLeader + " is alive");
                         socket.connect(new InetSocketAddress("localhost", currLeader), timeout);
-//                        log.info("Leader " + currLeader + " is alive");
+                        log.info("Leader " + currLeader + " is alive");
                     } catch (IOException e) {
                         log.info("Leader " + currLeader + " is dead");
                         initiateElection();
@@ -136,7 +136,8 @@ public class ServerApplication {
                     if (serverPort > syncPort) {
                         String message = "{ \"type\": \"Election\", \"portVal\":" + syncPort + "}";
                         response = sendMessage(serverPort, message);
-                        if(Objects.equals(response, "Bully")){
+                        if(response.equals("Bully")){
+                            log.info("Got bullied");
                             break;
                         }
                     }
@@ -179,45 +180,42 @@ public class ServerApplication {
                 while (true) {
                     Socket clientSocket = serverSocket.accept();
 
-                    new Thread(() -> {
-                        try {
-                            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+                    try {
+                        BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 
-                            String message;
-                            while ((message = in.readLine()) != null) {
-                                log.info("Received this message: " + message);
-                                JSONObject messageJson = new JSONObject(message);
-                                switch (messageJson.getString("type")) {
-                                    case "Leader" -> {
-                                        currLeader = messageJson.getInt("portVal");
-                                        log.info("-------CURRENT LEADER:--------" + currLeader);
-                                        running = false;
-                                    }
-                                    case "Election" -> {
-                                        if (messageJson.getInt("portVal") < syncPort) {
-                                            // Write code here to send a "Bully" message back to the client with the same port
-                                            JSONObject responseJson = new JSONObject();
-                                            String responseString = "Bully\n";
-                                            out.write(responseString);
-                                            out.flush();
-                                            log.info("Sent a 'Bully' message to client with port: " + clientSocket.getPort());
-                                            if (!running) {
-                                                initiateElection();
-                                            }
+                        String message;
+                        while ((message = in.readLine()) != null) {
+                            log.info("Received this message: " + message);
+                            JSONObject messageJson = new JSONObject(message);
+                            switch (messageJson.getString("type")) {
+                                case "Leader" -> {
+                                    currLeader = messageJson.getInt("portVal");
+                                    log.info("-------CURRENT LEADER:--------" + currLeader);
+                                    running = false;
+                                }
+                                case "Election" -> {
+                                    if (messageJson.getInt("portVal") < syncPort) {
+                                        // Write code here to send a "Bully" message back to the client with the same port
+                                        JSONObject responseJson = new JSONObject();
+                                        String responseString = "Bully\n";
+                                        out.write(responseString);
+                                        out.flush();
+                                        log.info("Sent a 'Bully' message to client with port: " + clientSocket.getPort());
+                                        if (!running) {
+                                            initiateElection();
                                         }
                                     }
                                 }
                             }
-
-                            in.close();
-                            out.close();
-                            clientSocket.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
                         }
-                    }).start();
 
+                        in.close();
+                        out.close();
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             } catch (Exception e) {
                 log.warning("Error caught here: " + e.getMessage());
