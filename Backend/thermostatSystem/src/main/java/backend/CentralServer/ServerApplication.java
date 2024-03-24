@@ -19,7 +19,7 @@ public class ServerApplication {
     private static List<ServerSocket> serverSockets;
     private boolean running = false;
 
-    private boolean iHaveLock = true; //TODO: change this to false
+    private boolean iHaveLock = false; //TODO: change this to false
 
     private KafkaService kafkaService;
 
@@ -185,43 +185,62 @@ public class ServerApplication {
     //TODO: can prob just use sendOneMessage()
     private void sendEnterCS(int thisSyncPort) {
         try {
-            //socket setup
-            Socket socket = new Socket("localhost", thisSyncPort);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            if(thisSyncPort != currLeaderSync) {
+                //socket setup
+                Socket socketOut = new Socket("localhost", currLeaderSync);
+                BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socketOut.getOutputStream()));
 
-            //send request to leader
-            String message = "{ \"type\": \"Request\", \"portVal\":" + thisSyncPort + "}";
-            log.info("Sending this SYNC message: " + message + " to port: " + thisSyncPort);
-            out.write(message + "\n");
-            out.flush();
-            log.info("Message sent");
+                Socket socketIn = new Socket("localhost", thisSyncPort);
+                BufferedReader in = new BufferedReader(new InputStreamReader(socketIn.getInputStream()));
 
-            //TODO: problem here
-            // Indefinitely wait for acquire response from leader
-            String response = null;
-            boolean responseReceived = false;
-            while (!responseReceived) { //TODO: may have to include an additonal condition here
-                try {
-                    // Read the response (this will block until data is available or an EOF is reached)
-                    response = in.readLine();
-                    responseReceived = true; // Response received, exit loop
-                } catch (IOException e) {
-                    // Handle IOException, e.g., connection reset by peer
-                    //TODO: change later
-                    log.info("Error reading sync response: " + e.getMessage());
+                //send request to leader
+                String message = "{ \"type\": \"Request\", \"portVal\":" + thisSyncPort + "}";
+                log.info("Sending this SYNC message: " + message + " to port: " + currLeaderSync);
+                out.write(message + "\n");
+                out.flush();
+                log.info("Message sent");
+
+                //TODO: problem here
+                // Indefinitely wait for acquire response from leader
+//                String response = null;
+//                boolean responseReceived = false;
+//                while (!responseReceived) { //TODO: may have to include an additonal condition here
+//                    try {
+//                        // Read the response (this will block until data is available or an EOF is reached)
+//                        response = in.readLine();
+//                        responseReceived = true; // Response received, exit loop
+//                    } catch (IOException e) {
+//                        // Handle IOException, e.g., connection reset by peer
+//                        //TODO: change later
+//                        log.info("Error reading sync response: " + e.getMessage());
+//                    }
+//                }
+                String response = in.readLine();
+
+                log.info("Received this message: " + response + " from port: " + currLeaderSync);
+
+                //close socket connections
+                in.close();
+                out.close();
+                socketOut.close();
+                socketIn.close();
+
+                //log.info("Received this message: " + response + " from port: " + currLeaderSync);
+
+                //allow replica to enter critical section
+                iHaveLock = true;
+            }
+            else {
+                if(criticalSectionQ.isEmpty()) {
+                    log.info("CSQ is empty!");
+                    iHaveLock = true;
+                }
+                else {
+                    log.info("CSQ is not empty!");
+                    criticalSectionQ.add(thisSyncPort);
+                    iHaveLock = false;
                 }
             }
-
-            //close socket connections
-            in.close();
-            out.close();
-            socket.close();
-
-            log.info("Received this message: " + response + " from port: " + currLeaderSync);
-
-            //allow replica to enter critical section
-            iHaveLock = true;
         } catch (Exception e) {
             log.info("Error: " + e.getMessage());
         }
@@ -472,7 +491,7 @@ public class ServerApplication {
             while (true){ //TODO: do we need this while loop???
                 log.info("SYNC TEST");
                 //request permission to enter CS from leader
-                //sendEnterCS(syncPort);
+                sendEnterCS(syncPort);
                 if(iHaveLock){ //enter CS
                     String centralServerAddress = "127.0.0.1";
                     log.info("Update roomID: " + roomID + " temp: " + temp);
@@ -506,7 +525,7 @@ public class ServerApplication {
                         }
                     }
                     //exit out of CS
-                    //sendExitCS(syncPort);
+                    sendExitCS(syncPort);
                     break;
                 }
 
