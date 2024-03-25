@@ -185,68 +185,6 @@ public class ServerApplication {
         }).start();
     }
 
-    private void receiveSyncMessages(){
-        new Thread(() -> {
-            try {
-                ServerSocket serverSocket = new ServerSocket(syncPort);
-                log.info("Server started. Listening for messages...");
-
-                while (true) {
-                    if(currLeader == electionPort) {
-                        Socket clientSocket = serverSocket.accept();
-
-                        try {
-                            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-
-                            String message;
-                            while ((message = in.readLine()) != null) {
-                                log.info("Received this message: " + message);
-                                JSONObject messageJson = new JSONObject(message);
-                                switch (messageJson.getString("type")) {
-                                    case "Request" -> {
-                                        log.info("Request message: " + message);
-                                        int portVal = messageJson.getInt("portVal");
-                                        if(isCSBusy) { //critical section is busy
-                                            log.info("Critical Section is busy, adding sync port " + portVal + " to queue");
-                                            criticalSectionQ.add(portVal);
-                                        }
-                                        else { //critical section is not busy
-                                            log.info("Send acquire to sync port " + portVal);
-                                            isCSBusy = true;
-                                            sendOneMessage(portVal, "Acquire\n");
-                                        }
-                                    }
-                                    case "Release" -> {
-                                        log.info("Release message: " + message);
-                                        if(criticalSectionQ.isEmpty()) { //no replicas are waiting for CS
-                                            log.info("Release: Critical Section queue is empty");
-                                            isCSBusy = false; //CS is available
-                                        }
-                                        else { //at least one replica needs the CS
-                                            //take replica port out of the head of the queue
-                                            int portVal = criticalSectionQ.remove();
-                                            log.info("Send acquire to sync port " + portVal);
-                                            //inform the replica that it can enter CS
-                                            sendOneMessage(portVal, "Acquire\n");
-                                        }
-                                    }
-                                }
-                            }
-
-                            in.close();
-                            out.close();
-                            clientSocket.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.warning("Error caught here: " + e.getMessage());
-            }
-        }).start();
-    }
 
     public void receiveAcquireMessages(){
         new Thread(() -> {
@@ -616,13 +554,13 @@ public class ServerApplication {
                     out.close();
                     in.close();
                     socket.close();
+                    break;
                 } catch (IOException e) {
                     log.info("Update data port " + port + " is not available.");
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             }
-            //exit out of CS
         }
 
         public int getTemp(int roomID) {

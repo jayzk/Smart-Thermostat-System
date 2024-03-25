@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Arrays;
@@ -27,7 +26,7 @@ public class MemoryApplication {
 
 
     public MemoryApplication(int port, int numberOfRooms) {
-        log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + port);
+        log = Logger.getLogger(MemoryApplication.class.getName() + "-port:" + port);
         this.updatePort = port;
         this.requestPort = port + 100;
         this.syncPort = port + 200;
@@ -48,7 +47,6 @@ public class MemoryApplication {
                             try (Socket socket = new Socket("localhost", port)) {
                                 socket.setSoTimeout(1000);
                                 BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-
                                 for(Map.Entry<Integer, long[]> roomData: roomTemp.entrySet()){
                                     String message = "{ \"room\":" + roomData.getKey() +
                                             ", \"temperature\":" + roomData.getValue()[0] +
@@ -56,8 +54,6 @@ public class MemoryApplication {
                                     out.write(message + "\n");
                                     out.flush();
                                 }
-
-
                                 out.close();
                             } catch (IOException e) {
                                 log.info("Database on port " + port + " is dead");
@@ -66,7 +62,7 @@ public class MemoryApplication {
                     }
                 }
                 try {
-                    Thread.sleep(5000); // Sleep for 2 seconds before next check
+                    Thread.sleep(5000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -89,7 +85,6 @@ public class MemoryApplication {
 
                         String message;
                         while ((message = in.readLine()) != null) {
-                            log.info("Received this message: " + message);
                             JSONObject messageJson = new JSONObject(message);
 
                             int roomNum = messageJson.getInt("room");
@@ -118,11 +113,9 @@ public class MemoryApplication {
 
     public void startListening() {
         new Thread(() -> {
-            System.out.println("Listening on port " + this.updatePort + "...");
             while (true){
                 try (ServerSocket serverSocket = new ServerSocket(this.updatePort)) {
                     Socket servSocket = serverSocket.accept();
-                    System.out.println("Listening for data on port " + this.updatePort + "...");
                     BufferedReader reader = new BufferedReader(new InputStreamReader(servSocket.getInputStream()));
                     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(servSocket.getOutputStream()));
                     String instruction;
@@ -135,7 +128,6 @@ public class MemoryApplication {
                         int room = roomTempJson.getInt("room");
                         long timeStamp = roomTempJson.getInt("timestamp");
 
-                        System.out.println("Instruction received: " + instruction);
 
                         int temperature = roomTempJson.getInt("temperature");
                         addTemperature(room, (long) temperature, timeStamp);
@@ -156,7 +148,6 @@ public class MemoryApplication {
             while (true){
                 try (ServerSocket serverSocket = new ServerSocket(this.requestPort)) {
                     Socket servSocket = serverSocket.accept();
-                    System.out.println("Listening for data on port " + this.requestPort + "...");
                     BufferedReader reader = new BufferedReader(new InputStreamReader(servSocket.getInputStream()));
                     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(servSocket.getOutputStream()));
                     String instruction;
@@ -168,7 +159,6 @@ public class MemoryApplication {
 
                         int room = roomTempJson.getInt("room");
 
-                        System.out.println("Instruction received: " + instruction);
 
                         //Check current temperature
                         writer.write(getTemperature(room) + "\n");
