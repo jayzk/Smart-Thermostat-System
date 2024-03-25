@@ -55,8 +55,9 @@ public class MemoryApplication {
                                     out.flush();
                                 }
                                 out.close();
-                            } catch (IOException e) {
-                                log.info("Database on port " + port + " is dead");
+                                log.info("Sent updates to port: " + port);
+                            } catch (IOException ignored) {
+
                             }
                         }
                     }
