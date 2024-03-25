@@ -160,6 +160,9 @@ public class ProxyServer {
             InputStream inputStream = socket.getInputStream();
             BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
             currentTemp = in.readLine();
+
+            System.out.println("Current temp: " + currentTemp);
+
             out.close();
             in.close();
             socket.close();

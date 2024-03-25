@@ -30,6 +30,7 @@ public class ServerApplication {
     private int currLeaderSync = 0; //linked with sync ports (for sync ports to know who is currently leader)
     private final int[] allElectionPorts = new int[]{10500, 10501, 10502, 10503};
     private final int[] db_ports = new int[]{12000, 12001, 12002, 12003};
+    private final int[] db_getTemp_ports = new int[]{12100, 12101, 12102, 12103};
     private final ClientHandler clientHandler;
     private Queue<Integer> criticalSectionQ = new LinkedList<>();
     private boolean isCSBusy = false;
@@ -515,7 +516,7 @@ public class ServerApplication {
                         String topic = record.topic();
                         String numberStr = topic.substring("room".length());
                         int roomNum = Integer.parseInt(numberStr);
-                        clientHandler.updateData(roomNum, Integer.parseInt(record.value()));
+                        clientHandler.updateData(roomNum, Integer.parseInt(record.value()), record.timestamp());
                     }
                     sendExitCS();
                 }
@@ -588,10 +589,9 @@ public class ServerApplication {
             this.kafkaService = service;
         }
 
-        public void updateData(int roomID, int temp) {
+        public void updateData(int roomID, int temp, long recordTimeStamp) {
             String centralServerAddress = "127.0.0.1";
             log.info("Update roomID: " + roomID + " temp: " + temp);
-//                    sendEnterCS(currLeaderSync, "SYNC TEST");
 
             for (int port : db_ports) {
                 try {
@@ -604,7 +604,9 @@ public class ServerApplication {
 
                     // Send request to the JAVA DB
                     log.info("Send update request to port: " + port);
-                    String updateMassage = "{ \"type\": 1, \"room\":" + roomID + ", \"temperature\":" + temp + "}";
+                    String updateMassage = "{ \"type\": 1, \"room\":" + roomID +
+                            ", \"temperature\":" + temp +
+                            ", \"timestamp\":"+ recordTimeStamp +"}";
                     out.println(updateMassage);
 
                     // Create input stream to receive response
@@ -629,7 +631,7 @@ public class ServerApplication {
             String centralServerAddress = "127.0.0.1";
             log.info("Get temperature from roomID: " + roomID);
 
-            for (int port : db_ports) {
+            for (int port : db_getTemp_ports) {
                 try {
                     // Create a socket connection to the central server
                     Socket socket = new Socket(centralServerAddress, port);
@@ -654,8 +656,7 @@ public class ServerApplication {
                     in.close();
                     socket.close();
                     intValue = Integer.parseInt(respond);
-                    // return intValue;
-
+                    break;
                 } catch (IOException e) {
                     log.info("Get temp request data port " + port + " is not avalible.");
                 }

@@ -5,31 +5,124 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import org.json.JSONObject;
 
 public class MemoryApplication {
-    private Map<Integer, Integer> roomTemp;
-    private int port;
+    private Map<Integer, long[]> roomTemp;
+    private int requestPort;
+    private int updatePort;
+    private int syncPort;
+
+    private int[] knownDBPorts = new int[]{12200, 12201, 12202, 12203};
+
+    private final Logger log;
+
 
     public MemoryApplication(int port, int numberOfRooms) {
-        this.port = port;
+        log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + port);
+        this.updatePort = port;
+        this.requestPort = port + 100;
+        this.syncPort = port + 200;
         this.roomTemp = new HashMap<>();
         initializeHashMap(numberOfRooms);
         startListening();
+        sendDBDataMessageThread();
+        receiveMessage();
+        sendUpdates();
+    }
+
+    private void sendUpdates(){
+        new Thread(() -> {
+            while (true) {
+                synchronized (this) {
+                    for (int port: knownDBPorts) {
+                        if(port != syncPort){
+                            try (Socket socket = new Socket("localhost", port)) {
+                                socket.setSoTimeout(1000);
+                                BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+                                for(Map.Entry<Integer, long[]> roomData: roomTemp.entrySet()){
+                                    String message = "{ \"room\":" + roomData.getKey() +
+                                            ", \"temperature\":" + roomData.getValue()[0] +
+                                            ", \"timestamp\":" + roomData.getValue()[1] + "}";
+                                    out.write(message + "\n");
+                                    out.flush();
+                                }
+
+
+                                out.close();
+                            } catch (IOException e) {
+                                log.info("Database on port " + port + " is dead");
+                            }
+                        }
+                    }
+                }
+                try {
+                    Thread.sleep(5000); // Sleep for 2 seconds before next check
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+
+    private void receiveMessage() {
+        Thread receiverThread = new Thread(() -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(this.syncPort);
+                log.info("Server started. Listening for messages...");
+
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+
+                    try {
+                        BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+
+                        String message;
+                        while ((message = in.readLine()) != null) {
+                            log.info("Received this message: " + message);
+                            JSONObject messageJson = new JSONObject(message);
+
+                            int roomNum = messageJson.getInt("room");
+                            long temp = messageJson.getLong("temperature");
+                            long timestamp = messageJson.getLong("timestamp");
+
+                            if(this.roomTemp.get(roomNum)[1] < timestamp){
+                                this.roomTemp.put(roomNum, new long[]{temp, timestamp});
+                            }
+                        }
+
+                        in.close();
+                        out.close();
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                log.warning("Error caught here: " + e.getMessage());
+            }
+        });
+
+        receiverThread.start();
     }
 
     public void startListening() {
         new Thread(() -> {
-            System.out.println("Listening on port " + port + "...");
+            System.out.println("Listening on port " + this.updatePort + "...");
             while (true){
-                try (ServerSocket serverSocket = new ServerSocket(this.port)) {
+                try (ServerSocket serverSocket = new ServerSocket(this.updatePort)) {
                     Socket servSocket = serverSocket.accept();
-                    System.out.println("Listening for data on port " + this.port + "...");
+                    System.out.println("Listening for data on port " + this.updatePort + "...");
                     BufferedReader reader = new BufferedReader(new InputStreamReader(servSocket.getInputStream()));
                     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(servSocket.getOutputStream()));
                     String instruction;
@@ -39,22 +132,13 @@ public class MemoryApplication {
                         // if (instruction != null){
                         JSONObject roomTempJson = new JSONObject(instruction);
 
-                        int type = roomTempJson.getInt("type");
                         int room = roomTempJson.getInt("room");
+                        long timeStamp = roomTempJson.getInt("timestamp");
 
                         System.out.println("Instruction received: " + instruction);
 
-
-                        if (type == 0){
-                            //Check current temperature
-                            writer.write(getTemperature(room) + "\n");
-                            writer.flush();
-                        }
-                        else if (type == 1){
-                            //Change temperature
-                            int temperature = roomTempJson.getInt("temperature");
-                            addTemperature(room, temperature);
-                        }
+                        int temperature = roomTempJson.getInt("temperature");
+                        addTemperature(room, (long) temperature, timeStamp);
 
                     }
                     printRoomTemperatures();
@@ -65,23 +149,57 @@ public class MemoryApplication {
         }).start();
     }
 
-    public void addTemperature(Integer roomId, Integer temperature) {
-        roomTemp.put(roomId, temperature);
+
+    public void sendDBDataMessageThread() {
+        new Thread(() -> {
+            System.out.println("Listening on port " + this.requestPort + "...");
+            while (true){
+                try (ServerSocket serverSocket = new ServerSocket(this.requestPort)) {
+                    Socket servSocket = serverSocket.accept();
+                    System.out.println("Listening for data on port " + this.requestPort + "...");
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(servSocket.getInputStream()));
+                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(servSocket.getOutputStream()));
+                    String instruction;
+
+                    while ((instruction = reader.readLine()) != null) {
+                        // instruction = reader.readLine();
+                        // if (instruction != null){
+                        JSONObject roomTempJson = new JSONObject(instruction);
+
+                        int room = roomTempJson.getInt("room");
+
+                        System.out.println("Instruction received: " + instruction);
+
+                        //Check current temperature
+                        writer.write(getTemperature(room) + "\n");
+                        writer.flush();
+
+                    }
+                    printRoomTemperatures();
+                } catch (IOException e) {
+                    System.out.println("Exception recieved: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    public void addTemperature(Integer roomId, Long temperature, Long timeStamp) {
+        roomTemp.put(roomId, new long[]{temperature, timeStamp});
     }
     public void initializeHashMap(int maxRoomNumber) {
         for (int roomNumber = 1; roomNumber <= maxRoomNumber; roomNumber++) {
-            roomTemp.put(roomNumber, 0);
+            roomTemp.put(roomNumber, new long[]{0, -1});
         }
     }
 
-    public int getTemperature(Integer roomId) {
-        return roomTemp.getOrDefault(roomId, 0);
+    public long getTemperature(Integer roomId) {
+        return roomTemp.get(roomId)[0];
     }
 
     public void printRoomTemperatures() {
         System.out.println("Room Temperatures:");
-        for (Map.Entry<Integer, Integer> entry : roomTemp.entrySet()) {
-            System.out.println("Room " + entry.getKey() + ": " + entry.getValue());
+        for (Map.Entry<Integer, long[]> entry : roomTemp.entrySet()) {
+            System.out.println("Room " + entry.getKey() + ": " + Arrays.toString(entry.getValue()));
         }
     }
 
