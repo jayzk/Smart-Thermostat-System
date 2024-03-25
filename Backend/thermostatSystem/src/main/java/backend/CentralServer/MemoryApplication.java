@@ -32,46 +32,54 @@ public class MemoryApplication {
         this.syncPort = port + 200;
         this.roomTemp = new HashMap<>();
         initializeHashMap(numberOfRooms);
-        startListening();
-        sendDBDataMessageThread();
-        receiveMessage();
-        sendUpdates();
+
+        receiveSyncMessageFromDB();
+        sendAliveMessageToAllDB();
+
+        receiveDataFromReplicaManager();
+        sendDataToReplicaManager();
     }
 
-    private void sendUpdates(){
-        new Thread(() -> {
-            while (true) {
-                synchronized (this) {
-                    for (int port: knownDBPorts) {
-                        if(port != syncPort){
-                            try (Socket socket = new Socket("localhost", port)) {
-                                socket.setSoTimeout(1000);
-                                BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                                for(Map.Entry<Integer, long[]> roomData: roomTemp.entrySet()){
-                                    String message = "{ \"room\":" + roomData.getKey() +
-                                            ", \"temperature\":" + roomData.getValue()[0] +
-                                            ", \"timestamp\":" + roomData.getValue()[1] + "}";
-                                    out.write(message + "\n");
-                                    out.flush();
-                                }
-                                out.close();
-                                log.info("Sent updates to port: " + port);
-                            } catch (IOException ignored) {
-
-                            }
-                        }
-                    }
-                }
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+    private void sendAliveMessageToAllDB(){
+        for (int port: knownDBPorts) {
+            if(port != syncPort){
+                try (Socket socket = new Socket("localhost", port)) {
+                    socket.setSoTimeout(1000);
+                    BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    String message = "{ \"type\": \"Alive\"" + "}";
+                    out.write(message + "\n");
+                    out.flush();
+                    out.close();
+                    log.info("Sent alive message to port: " + port);
+                } catch (IOException ignored) {
                 }
             }
-        }).start();
+        }
     }
 
-    private void receiveMessage() {
+    private void syncDatabaseReplicas(){
+        for (int port: knownDBPorts) {
+            if(port != syncPort){
+                try (Socket socket = new Socket("localhost", port)) {
+                    socket.setSoTimeout(1000);
+                    BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    for(Map.Entry<Integer, long[]> roomData: roomTemp.entrySet()){
+                        String message = "{ \"room\":" + roomData.getKey() +
+                                ", \"temperature\":" + roomData.getValue()[0] +
+                                ", \"timestamp\":" + roomData.getValue()[1] + "}";
+                        out.write(message + "\n");
+                        out.flush();
+                    }
+                    out.close();
+                    log.info("Sent updates to port: " + port);
+                } catch (IOException ignored) {
+
+                }
+            }
+        }
+    }
+
+    private void receiveSyncMessageFromDB() {
         Thread receiverThread = new Thread(() -> {
             try {
                 ServerSocket serverSocket = new ServerSocket(this.syncPort);
@@ -88,13 +96,21 @@ public class MemoryApplication {
                         while ((message = in.readLine()) != null) {
                             JSONObject messageJson = new JSONObject(message);
 
-                            int roomNum = messageJson.getInt("room");
-                            long temp = messageJson.getLong("temperature");
-                            long timestamp = messageJson.getLong("timestamp");
-
-                            if(this.roomTemp.get(roomNum)[1] < timestamp){
-                                this.roomTemp.put(roomNum, new long[]{temp, timestamp});
+                            if(messageJson.has("type") && messageJson.getString("type").equals("Alive")){
+                                syncDatabaseReplicas();
                             }
+                            else{
+                                int roomNum = messageJson.getInt("room");
+                                long temp = messageJson.getLong("temperature");
+                                long timestamp = messageJson.getLong("timestamp");
+
+
+
+                                if(this.roomTemp.get(roomNum)[1] < timestamp){
+                                    this.roomTemp.put(roomNum, new long[]{temp, timestamp});
+                                }
+                            }
+
                         }
 
                         in.close();
@@ -112,7 +128,7 @@ public class MemoryApplication {
         receiverThread.start();
     }
 
-    public void startListening() {
+    public void receiveDataFromReplicaManager() {
         new Thread(() -> {
             while (true){
                 try (ServerSocket serverSocket = new ServerSocket(this.updatePort)) {
@@ -132,6 +148,7 @@ public class MemoryApplication {
 
                         int temperature = roomTempJson.getInt("temperature");
                         addTemperature(room, (long) temperature, timeStamp);
+                        syncDatabaseReplicas();
 
                     }
                     printRoomTemperatures();
@@ -143,7 +160,7 @@ public class MemoryApplication {
     }
 
 
-    public void sendDBDataMessageThread() {
+    public void sendDataToReplicaManager() {
         new Thread(() -> {
             System.out.println("Listening on port " + this.requestPort + "...");
             while (true){
