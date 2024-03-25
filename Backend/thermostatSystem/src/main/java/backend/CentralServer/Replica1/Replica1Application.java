@@ -25,8 +25,14 @@ public class Replica1Application {
     @Value("${replica1.listenerPort}")
     private int replicaPort;
 
+    @Value("${replica1.electionPort}")
+    private int electionPort;
+
+    @Value("${replica1.syncPort}")
+    private int syncPort;
+
     @Bean
     public ServerApplication setUpReplica1App(){
-        return new ServerApplication(numberOfRooms, replicaPort);
+        return new ServerApplication(numberOfRooms, replicaPort, electionPort, syncPort);
     }
 }
