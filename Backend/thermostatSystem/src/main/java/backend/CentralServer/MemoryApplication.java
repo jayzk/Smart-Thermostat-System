@@ -104,10 +104,8 @@ public class MemoryApplication {
                                 long temp = messageJson.getLong("temperature");
                                 long timestamp = messageJson.getLong("timestamp");
 
-
-
                                 if(this.roomTemp.get(roomNum)[1] < timestamp){
-                                    this.roomTemp.put(roomNum, new long[]{temp, timestamp});
+                                    addTemperature(roomNum, temp, timestamp);
                                 }
                             }
 
@@ -143,7 +141,7 @@ public class MemoryApplication {
                         JSONObject roomTempJson = new JSONObject(instruction);
 
                         int room = roomTempJson.getInt("room");
-                        long timeStamp = roomTempJson.getInt("timestamp");
+                        long timeStamp = roomTempJson.getLong("timestamp");
 
 
                         int temperature = roomTempJson.getInt("temperature");
@@ -151,9 +149,10 @@ public class MemoryApplication {
                         syncDatabaseReplicas();
 
                     }
-                    printRoomTemperatures();
+
+//                    printRoomTemperatures();
                 } catch (IOException e) {
-                    System.out.println("Exception recieved: " + e.getMessage());
+                    log.info("Exception recieved: " + e.getMessage());
                 }
             }
         }).start();
@@ -162,7 +161,7 @@ public class MemoryApplication {
 
     public void sendDataToReplicaManager() {
         new Thread(() -> {
-            System.out.println("Listening on port " + this.requestPort + "...");
+            log.info("Listening on port " + this.requestPort + "...");
             while (true){
                 try (ServerSocket serverSocket = new ServerSocket(this.requestPort)) {
                     Socket servSocket = serverSocket.accept();
@@ -183,9 +182,9 @@ public class MemoryApplication {
                         writer.flush();
 
                     }
-                    printRoomTemperatures();
+//                    printRoomTemperatures();
                 } catch (IOException e) {
-                    System.out.println("Exception recieved: " + e.getMessage());
+                    log.info("Exception recieved: " + e.getMessage());
                 }
             }
         }).start();
@@ -193,10 +192,11 @@ public class MemoryApplication {
 
     public void addTemperature(Integer roomId, Long temperature, Long timeStamp) {
         roomTemp.put(roomId, new long[]{temperature, timeStamp});
+        log.info("Updated room data: " + roomId + " " + temperature + " " + timeStamp);
     }
     public void initializeHashMap(int maxRoomNumber) {
         for (int roomNumber = 1; roomNumber <= maxRoomNumber; roomNumber++) {
-            roomTemp.put(roomNumber, new long[]{0, -1});
+            roomTemp.put(roomNumber, new long[]{0, 0});
         }
     }
 
@@ -205,9 +205,9 @@ public class MemoryApplication {
     }
 
     public void printRoomTemperatures() {
-        System.out.println("Room Temperatures:");
+        log.info("Room Temperatures:");
         for (Map.Entry<Integer, long[]> entry : roomTemp.entrySet()) {
-            System.out.println("Room " + entry.getKey() + ": " + Arrays.toString(entry.getValue()));
+            log.info("Room " + entry.getKey() + ": " + Arrays.toString(entry.getValue()));
         }
     }
 
