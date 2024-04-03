@@ -61,16 +61,15 @@ public class ServerApplication {
         new Thread(() -> {
             while (true) {
                 synchronized (this) {
-                    //log.info("leader: " + currLeader + " elecPort: " + electionPort); //TODO: delete later maybe
                     if (currLeader != electionPort && currLeader > 0) {
                         try (Socket socket = new Socket()) {
                             // Timeout for connection attempt (in milliseconds)
                             socket.setSoTimeout(1000);
                             int timeout = 2000;
 
-//                            log.info("Checking if leader, " + currLeader + " is alive");
+                            log.info("Checking if leader, " + currLeader + " is alive");
                             socket.connect(new InetSocketAddress("localhost", currLeader), timeout);
-//                            log.info("Leader " + currLeader + " is alive");
+                            log.info("Leader " + currLeader + " is alive");
                         } catch (IOException e) {
                             log.info("Leader " + currLeader + " is dead");
                             initiateElection();
@@ -531,32 +530,46 @@ public class ServerApplication {
             String centralServerAddress = "127.0.0.1";
             log.info("Update roomID: " + roomID + " temp: " + temp);
 
-            for (int port : db_ports) {
-                try {
-                    // Create a socket connection to the central server
-                    Socket socket = new Socket(centralServerAddress, port);
+            boolean dbUpdated = false;
+            while(!dbUpdated){
+                for (int port : db_ports) {
+                    try {
+                        // Create a socket connection to the central server
+                        Socket socket = new Socket(centralServerAddress, port);
 
-                    // Create output stream to send request
-                    OutputStream outputStream = socket.getOutputStream();
-                    PrintWriter out = new PrintWriter(outputStream, true);
+                        // Create output stream to send request
+                        OutputStream outputStream = socket.getOutputStream();
+                        PrintWriter out = new PrintWriter(outputStream, true);
 
-                    // Send request to the JAVA DB
-                    log.info("Send update request to port: " + port);
-                    String updateMassage = "{ \"type\": 1, \"room\":" + roomID +
-                            ", \"temperature\":" + temp +
-                            ", \"timestamp\":"+ recordTimeStamp +"}";
-                    out.println(updateMassage);
+                        // Send request to the JAVA DB
+                        log.info("Send update request to port: " + port);
+                        String updateMessage = "{ \"type\": 1, \"room\":" + roomID +
+                                ", \"temperature\":" + temp +
+                                ", \"timestamp\":"+ recordTimeStamp +"}";
+                        log.info("Message from thermo: " + updateMessage);
+                        out.println(updateMessage);
 
-                    // Create input stream to receive response
-                    InputStream inputStream = socket.getInputStream();
-                    BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-                    Thread.sleep(10);
-                    out.close();
-                    in.close();
-                    socket.close();
+                        // Create input stream to receive response
+                        InputStream inputStream = socket.getInputStream();
+                        BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                        Thread.sleep(10);
+                        out.close();
+                        in.close();
+                        socket.close();
+                        dbUpdated = true;
+                        break;
+                    } catch (IOException e) {
+                        log.info("Update data port " + port + " is not available.");
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+                if(dbUpdated){
                     break;
-                } catch (IOException e) {
-                    log.info("Update data port " + port + " is not available.");
+                }
+                try {
+                    Thread.sleep(3000);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
