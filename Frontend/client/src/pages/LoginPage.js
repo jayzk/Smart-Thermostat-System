@@ -3,9 +3,14 @@ import React, { useState } from "react";
 
 function LoginPage() {
   const [roomNum, setRoomNum] = useState(0); // Initialize roomNum state
+  const [password, setPassword] = useState("");
 
   const handleRoomNumChange = (event) => {
     setRoomNum(event.target.value); // Update roomNum state as user types
+  };
+
+  const handlePasswordChange = (event) => {
+    setPassword(event.target.value);
   };
 
   let navigate = useNavigate();
@@ -13,9 +18,12 @@ function LoginPage() {
     if(roomNum <= 0) {
       alert("Room number does not exist!");
     }
+    else if(password != "password") {
+      alert("Incorrect password!")
+    }
     else {
       let path = `/room/${roomNum}`;
-    navigate(path);
+      navigate(path);
     }
   };
 
@@ -43,6 +51,8 @@ function LoginPage() {
             type="password"
             class="form-control"
             id="exampleInputPassword1"
+            value={password}
+            onChange={handlePasswordChange}
           />
         </div>
         <button type="submit" class="btn btn-primary" onClick={login}>
