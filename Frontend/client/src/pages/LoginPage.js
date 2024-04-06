@@ -18,7 +18,7 @@ function LoginPage() {
     if(roomNum <= 0) {
       alert("Room number does not exist!");
     }
-    else if(password != "password") {
+    else if(password !== "password") {
       alert("Incorrect password!")
     }
     else {
