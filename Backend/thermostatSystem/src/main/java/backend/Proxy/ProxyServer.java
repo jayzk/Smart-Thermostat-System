@@ -1,5 +1,6 @@
 package backend.Proxy;
 
+import backend.CentralServer.ServerApplication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +9,7 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 
 @RestController
@@ -17,7 +19,11 @@ public class ProxyServer {
     private ArrayList<Integer> serverPorts;
     private int loadIndex;
 
+    private final Logger log;
+
+
     public ProxyServer() {
+        log = Logger.getLogger(ServerApplication.class.getName() + "-port");
         this.centralServerAddress = "127.0.0.1";
         this.serverPorts = new ArrayList<Integer>();
         this.serverPorts.add(10000);
@@ -25,6 +31,7 @@ public class ProxyServer {
         this.serverPorts.add(10002);
         this.serverPorts.add(10003);
         this.loadIndex = 0;
+
     }
 
 
@@ -32,15 +39,22 @@ public class ProxyServer {
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
     public String handlePostRequest(@RequestBody String requestBody) {
 
+        log.info("======================================");
 
         // Process the request body
-        System.out.println("Received POST request with body: " + requestBody);
-
-        String[] arrOfStr = requestBody.split(",");
-        String checkMessage = "{ \"type\": 2," + arrOfStr[1] + "}";
-        // System.out.println("Checking message: " + checkMessage);
+        log.info("Received POST request with body: " + requestBody);
         
+        sendPostRequest(requestBody);
+
+        // You can return a response if needed
+        log.info("======================================");
+
+        return "ACK from proxy server";
+    }
+
+    public void sendPostRequest(String requestBody){
         // Get avalible server ports
+        String checkMessage = "{ \"type\": 2 }";
         ArrayList<Integer> avalibleServerPorts = checkAvalible(checkMessage);
 
         // Find the port post request
@@ -53,32 +67,40 @@ public class ProxyServer {
             }
         }
             
+        String respond = "";
+        try {
+            // Create a socket connection to the central server
+            Socket socket = new Socket(centralServerAddress, centralServerPort);
 
-            try {
-                // Create a socket connection to the central server
-                Socket socket = new Socket(centralServerAddress, centralServerPort);
+            // Create output stream to send request
+            OutputStream outputStream = socket.getOutputStream();
+            PrintWriter out = new PrintWriter(outputStream, true);
 
-                // Create output stream to send request
-                OutputStream outputStream = socket.getOutputStream();
-                PrintWriter out = new PrintWriter(outputStream, true);
-
-                // Send request to the server
-                System.out.println("Send changing temperature request to port: " + centralServerPort);
-                out.println(requestBody);
+            // Send request to the server
+            log.info("Send changing temperature request to port: " + centralServerPort);
+            out.println(requestBody);
 
 
-                // Create input stream to receive response
-                InputStream inputStream = socket.getInputStream();
-                BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+            // Create input stream to receive response
+            
+            InputStream inputStream = socket.getInputStream();
+            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+            respond = in.readLine();
+            // log.info("Respond: " + respond);
+            if(respond.equals("Changing success")){
+                log.info("Request: " + requestBody + " success.");
+            }else{
                 out.close();
                 in.close();
                 socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-        // You can return a response if needed
-        return "ACK from proxy server";
+                sendPostRequest(requestBody);
+            }  
+            out.close();
+            in.close();
+            socket.close();
+        } catch (IOException e) {
+            sendPostRequest(requestBody);
+        }
     }
 
     public ArrayList<Integer> checkAvalible(String checkMessage){
@@ -88,7 +110,7 @@ public class ProxyServer {
             try {
                 String respond = "";
                 Socket socket = new Socket(centralServerAddress, serverPorts.get(i));
-                System.out.println("Check replica Alive: replica port " + serverPorts.get(i));
+                log.info("Check replica Alive: replica port " + serverPorts.get(i));
 
                 // Create output stream to send request
                 OutputStream outputStream = socket.getOutputStream();
@@ -101,16 +123,16 @@ public class ProxyServer {
                 InputStream inputStream = socket.getInputStream();
                 BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
                 respond = in.readLine();
-                // System.out.println("Respond: " + respond);
+                // log.info("Respond: " + respond);
                 if(respond.equals("Alive")){
                     avalibleServerPorts.add(serverPorts.get(i));
-                    System.out.println("Port " + serverPorts.get(i) + " is alive.");
+                    log.info("Port " + serverPorts.get(i) + " is alive.");
                 }               
                 out.close();
                 in.close();
                 socket.close();
             } catch (IOException e) {
-                System.out.println("Port " + serverPorts.get(i) + " is not alive.");
+                log.info("Port " + serverPorts.get(i) + " is not alive.");
             }
         }
         return avalibleServerPorts;
@@ -122,14 +144,25 @@ public class ProxyServer {
     //change temp request
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
     public ResponseEntity<String> handleCurrentTempRequest(@RequestParam String roomNum) {
+        log.info("======================================");
         // Process the request body
 
         //open socket to central server
-        System.out.println("Received get request with room number: " + roomNum);
+        log.info("Received get request with room number: " + roomNum);
 
+        String currentTemp = sendCurrentTempRequest(roomNum);
+
+        log.info("======================================");
+
+
+        return new ResponseEntity<String>(currentTemp, HttpStatus.OK);
+
+    }
+
+    public String sendCurrentTempRequest (String roomNum){
         // Get avalible server ports
-        String checkMessage= "{ \"type\": 2, \"room\":" + roomNum + "}";
-        // System.out.println("Checking message: " + checkMessage);
+        String checkMessage= "{ \"type\": 2 }";
+        // log.info("Checking message: " + checkMessage);
         ArrayList<Integer> avalibleServerPorts = checkAvalible(checkMessage);
 
         // Find the port post request
@@ -151,7 +184,7 @@ public class ProxyServer {
             OutputStream outputStream = socket.getOutputStream();
             PrintWriter out = new PrintWriter(outputStream, true);
 
-            System.out.println("Send checking temperature request to port: " + centralServerPort);
+            log.info("Send checking temperature request to port: " + centralServerPort);
             String data= "{ \"type\": 0, \"room\":" + roomNum + "}";
             out.println(data);
 
@@ -161,18 +194,22 @@ public class ProxyServer {
             BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
             currentTemp = in.readLine();
 
-            System.out.println("Current temp: " + currentTemp);
+            if(currentTemp == null){
+                out.close();
+                in.close();
+                socket.close();
+                currentTemp = sendCurrentTempRequest (roomNum);
+            }
+            log.info("Current temp: " + currentTemp);
 
             out.close();
             in.close();
             socket.close();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            currentTemp = sendCurrentTempRequest (roomNum);
         }
-
-        return new ResponseEntity<String>(currentTemp, HttpStatus.OK);
-
+        return currentTemp;
     }
 
 }

@@ -626,20 +626,24 @@ public class ServerApplication {
                     JSONObject roomTempJson = new JSONObject(instruction);
 
                     int type = roomTempJson.getInt("type");
-                    int room = roomTempJson.getInt("room");
+                    
 
 
                     if (type == 0) {
+                        int room = roomTempJson.getInt("room");
                         //Check current temperature
                         writer.write(Integer.toString(getTemp(room)) + "\n");
                         writer.flush();
                     } else if (type == 1) {
+                        int room = roomTempJson.getInt("room");
                         int temperature = roomTempJson.getInt("temperature");
                         //Change temperature
                         // Extract room and temperature values
                         kafkaService.setRoomTopic("room" + room);
                         kafkaService.produce(0, temperature);
                         log.info("Received a change temperature request for room: " + room + " value: " + temperature);
+                        writer.write("Changing success\n");
+                        writer.flush();
                     } else if (type == 2) {
                         log.info("Received an Alive message from proxy");
                         // Return if replica is alive

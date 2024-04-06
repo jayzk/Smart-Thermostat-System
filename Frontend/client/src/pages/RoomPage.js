@@ -18,6 +18,17 @@ function RoomPage() {
       console.log("Data received:", jsonData); // Log data to the console
     } catch (error) {
       console.error("Error fetching data:", error);
+      try {
+        const response = await fetch(
+            `http://localhost:8081/currentTemp?roomNum=${roomNum}`
+        );
+        const jsonData = await response.json();
+        setCurrentTemp(jsonData);
+
+        console.log("Data received:", jsonData); // Log data to the console
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
     }
   };
 
@@ -46,6 +57,7 @@ function RoomPage() {
   };
 
   const url = "http://localhost:8080/endpoint";
+  const backupUrl = "http://localhost:8081/endpoint";
   // Options for the fetch request
   const options = {
     method: "POST", // or 'GET', 'PUT', 'DELETE', etc.
@@ -56,14 +68,19 @@ function RoomPage() {
     console.log("Setting temperature");
 
     fetch(url, options)
-      .then((data) => {
-        console.log("Response:", data);
-      })
-      .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
-      });
-
-      alert("Temperature has been set");
+        .then((data) => {
+          console.log("Response:", data);
+        })
+        .catch((error) => {
+          fetch(backupUrl, options)
+              .then((data) => {
+                console.log("Response:", data);
+              })
+              .catch((error) => {
+                console.error("There was a problem with the fetch operation:", error);
+              });
+        });
+    alert("Temperature has been set");
   };
 
   return (
