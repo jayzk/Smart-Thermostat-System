@@ -28,3 +28,11 @@ npm run start
 ```
 
 From here a page should open in your browser
+
+## Login page
+Here you will be prompted to input a room number and a password
+
+![image](https://github.com/jayzk/Smart-Thermostat-System/assets/57610243/5403708c-b9c6-4e9b-af90-8f49612729ee)
+
+- As of now room numbers 1-30 exist, any other room number inputted will result in a alert saying the room doesn't exist
+- The password for each room is just "password" for simplicity sake
