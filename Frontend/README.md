@@ -27,4 +27,4 @@ npm install
 npm run start
 ```
 
-From here a page should open in your browser and a react loading screen will appear
+From here a page should open in your browser
