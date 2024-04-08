@@ -66,3 +66,15 @@ the system depends on each topic to have 2 topics. To confirm that 2 partitions 
 > If you are still getting 1 partition delete the folders kafka-logs
 > For Mac: type in terminal: rm -rf ~/tmp/kafka-logs
 > For Windows: go into C:\tmp\kafka-logs and delete the folder kafka-logs
+
+# Running the backend
+> [!CAUTION]
+> If the Kafka server is randomly terminating, go to your tmp folder and delete the folder "kafka-logs"
+1. Start up the zookeeper server first
+2. Start up the Kafka server on a separate terminal
+3. To start the thermostats run ThermostatBackendApplication under the Thermostats package
+4. To start the proxy server run ProxyApplication under the Proxy package
+5. To start any of the central servers run Replica#Application under the CentralServer/Replica# package (at least one of them has to be running)
+   - For example: Replica1Application can be run under the CentralServer/Replica1 package
+6. To start any of the database servers run DB_replica# under the CentralServer/Database# package (at least one of them has to be running)
+   - For example: DB_replica1 can be run under the CentralServer/Database1 package

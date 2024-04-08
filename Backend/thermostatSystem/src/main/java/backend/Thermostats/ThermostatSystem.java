@@ -6,6 +6,11 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 import java.util.logging.Logger;
 
+/*
+ * Mock Thermostat System
+ * This class listens for temperature change commands and adjusting the temperature of a specific room
+ */
+
 public class ThermostatSystem {
     int currentTemp;
     final int MAX_TEMP = 32;
@@ -19,6 +24,11 @@ public class ThermostatSystem {
 
     private static final Logger log = Logger.getLogger(ThermostatSystem.class.getName());
 
+    /*
+     * Constructor
+     * Initializes a new thermostat system for the specified room and sets a random current temperature
+     * Initializes Kafka consumer for listening to temperature change requests and starts a thread to listen for these requests
+     */
     public ThermostatSystem(String roomId) {
         this.roomId = roomId;
         currentTemp = (int) ((Math.random() * (MAX_TEMP - MIN_TEMP)) + MIN_TEMP);
@@ -29,6 +39,10 @@ public class ThermostatSystem {
         listenThread.start();
     }
 
+    /*
+     * listenForChangeTemp()
+     * Listens for temperature change commands from Kafka. Upon receiving a command, it updates currentTemp 
+     */
     public void listenForChangeTemp(){
         while (true){
             ConsumerRecords<String, String> records = kafka.consume();
@@ -50,11 +64,19 @@ public class ThermostatSystem {
         }
     }
 
+    /*
+     * sendTempChangeMessage()
+     * Publishes the current temperature to a Kafka topic
+     */
     public void sendTempChangeMessage(){
         kafka.produce(SENDER_PARTITION, currentTemp);
     }
 
 
+    /*
+     * changeTemp(int new_temperature)
+     * Adjusts currentTemp to match new_temperature then sends temperature updates through Kafka after each adjustment
+     */
     public void changeTemp(int new_temperature) {
         log.info("Temperature change begin for " + roomId);
         log.info("Current temp is: "  + currentTemp);
