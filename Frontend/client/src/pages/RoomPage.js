@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from "react";
-//import { useParams } from "react-router";
 import { useParams } from "react-router-dom";
 
+/**
+ * Functional component representing the room page
+ * Displays information about the room including current temperature and allows users to set desired temperature
+ */
 function RoomPage() {
+   // Initialize state variables for desired and current temperature
   const [desiredTemp, setDesiredTemp] = useState(20);
   const [currentTemp, setCurrentTemp] = useState(null);
+
+  // Initialize room number from URL parameters
   let { roomNum } = useParams();
 
+  // Function to fetch current temperature data
   const fetchData = async () => {
     try {
       const response = await fetch(
@@ -15,7 +22,8 @@ function RoomPage() {
       const jsonData = await response.json();
       setCurrentTemp(jsonData);
 
-      console.log("Data received:", jsonData); // Log data to the console
+      // Log data to the console
+      console.log("Data received:", jsonData);
     } catch (error) {
       console.error("Error fetching data:", error);
       try {
@@ -25,45 +33,47 @@ function RoomPage() {
         const jsonData = await response.json();
         setCurrentTemp(jsonData);
 
-        console.log("Data received:", jsonData); // Log data to the console
+        // Log data to the console
+        console.log("Data received:", jsonData);
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     }
   };
 
+  // Run fetchData function when the component mounts
   useEffect(() => {
-    // Fetch data when the component mounts
     fetchData();
   }, []); // Empty dependency array to ensure the effect runs only once on component mount
 
   // Function to increment desired temperature
   const incrementDesiredTemp = () => {
-    // Update state with incremented value
     setDesiredTemp(desiredTemp + 1);
   };
 
   // Function to decrement desired temperature
   const decrementDesiredTemp = () => {
-    // Update state with decremented value
     setDesiredTemp(desiredTemp - 1);
   };
 
-  // Data to send with the request
+  // Data to send with the request to set temperature
   const data = {
     type: 1,
     room: roomNum,
     temperature: desiredTemp,
   };
 
+  // URLs for setting temperature with primary and backup endpoints
   const url = "http://localhost:8080/endpoint";
   const backupUrl = "http://localhost:8081/endpoint";
+
   // Options for the fetch request
   const options = {
     method: "POST", // or 'GET', 'PUT', 'DELETE', etc.
     body: JSON.stringify(data), // Convert data to JSON string
   };
 
+  // Function to set temperature
   const setTemperature = () => {
     console.log("Setting temperature");
 
@@ -83,8 +93,8 @@ function RoomPage() {
     alert("Temperature has been set");
   };
 
+  // render room page form
   return (
-    
     <div class="container my-5 d-flex flex-column align-items-center justify-content-center align-middle">
       <div class="card w-50 my-2">
         <div class="card-body">
