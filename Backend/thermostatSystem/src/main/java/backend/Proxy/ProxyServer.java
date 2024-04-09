@@ -11,6 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
+/**
+ * Proxy sever responsible for handling incoming http requests and send them to available server replicas
+ * Using round-robin algorithm to send to server replicas
+ * Handle current temperature request and set temperature request
+ */
 
 @RestController
 public class ProxyServer {
@@ -21,7 +26,10 @@ public class ProxyServer {
 
     private final Logger log;
 
-
+    /**
+     * Constructor for the ProxyServer class
+     * Initializes the central server address, server ports, and load index(for round-robin algorithm)
+     */
     public ProxyServer() {
         log = Logger.getLogger(ServerApplication.class.getName() + "-port");
         this.centralServerAddress = "127.0.0.1";
@@ -34,7 +42,11 @@ public class ProxyServer {
 
     }
 
-
+    /**
+     * Handles incoming POST requests(set temperature request)
+     * 
+     * @param requestBody The request body received in http request from frontend
+     */
     @PostMapping("/endpoint")
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
     public String handlePostRequest(@RequestBody String requestBody) {
@@ -52,12 +64,19 @@ public class ProxyServer {
         return "ACK from proxy server";
     }
 
+    /**
+     * Sends a POST request to the appropriate server replica
+     * Handle fail to send request
+     * 
+     * @param requestBody the string to be sent in the POST request
+     */
     public void sendPostRequest(String requestBody){
-        // Get avalible server ports
+
+        // Get available server ports
         String checkMessage = "{ \"type\": 2 }";
         ArrayList<Integer> avalibleServerPorts = checkAvalible(checkMessage);
 
-        // Find the port post request
+        // Find the server port post request (round-robin)
         int centralServerPort;
         while (true) {
             centralServerPort = serverPorts.get(loadIndex);
@@ -81,15 +100,17 @@ public class ProxyServer {
             out.println(requestBody);
 
 
-            // Create input stream to receive response
-            
+            // Create input stream to receive response           
             InputStream inputStream = socket.getInputStream();
             BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
             respond = in.readLine();
-            // log.info("Respond: " + respond);
+
+            // Send successful
             if(respond.equals("Changing success")){
                 log.info("Request: " + requestBody + " success.");
-            }else{
+            }
+            // Fail to send, resend the request to next available server
+            else{
                 out.close();
                 in.close();
                 socket.close();
@@ -99,10 +120,17 @@ public class ProxyServer {
             in.close();
             socket.close();
         } catch (IOException e) {
+            // Fail to connect to server, resend the request to next available server
             sendPostRequest(requestBody);
         }
     }
 
+    /**
+     * Checks available server ports using socket and return a list of available server ports
+     * 
+     * @param checkMessage The message used to check server availability 
+     * @return A list of available server ports
+     */
     public ArrayList<Integer> checkAvalible(String checkMessage){
         ArrayList<Integer> avalibleServerPorts = new ArrayList<Integer>();
         // Check avaliable ports
@@ -123,7 +151,7 @@ public class ProxyServer {
                 InputStream inputStream = socket.getInputStream();
                 BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
                 respond = in.readLine();
-                // log.info("Respond: " + respond);
+                // If set response alive, add to avaliable array
                 if(respond.equals("Alive")){
                     avalibleServerPorts.add(serverPorts.get(i));
                     log.info("Port " + serverPorts.get(i) + " is alive.");
@@ -132,14 +160,19 @@ public class ProxyServer {
                 in.close();
                 socket.close();
             } catch (IOException e) {
+                // Fail to connect socket, so the server replica is dead
                 log.info("Port " + serverPorts.get(i) + " is not alive.");
             }
         }
         return avalibleServerPorts;
     }
 
-
-
+    /**
+     * Handles incoming GET http requests from frontend for checking current temperature
+     * 
+     * @param roomNum The room number for which the current temperature is requested
+     * @return A ResponseEntity containing the current temperature
+     */
     @GetMapping("/currentTemp")
     //change temp request
     @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8081"})
@@ -159,10 +192,16 @@ public class ProxyServer {
 
     }
 
+    /**
+     * Sends a request to appropriate server to retrieve current temperature for a room
+     * Handle fail to send request
+     * 
+     * @param roomNum The room number for which the temperature is requested to check
+     * @return The current temperature of the room
+     */
     public String sendCurrentTempRequest (String roomNum){
-        // Get avalible server ports
+        // Get available server ports
         String checkMessage= "{ \"type\": 2 }";
-        // log.info("Checking message: " + checkMessage);
         ArrayList<Integer> avalibleServerPorts = checkAvalible(checkMessage);
 
         // Find the port post request
@@ -193,7 +232,7 @@ public class ProxyServer {
             InputStream inputStream = socket.getInputStream();
             BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
             currentTemp = in.readLine();
-
+            // If not getting current temperature, resend the request to next available server
             if(currentTemp == null){
                 out.close();
                 in.close();
@@ -207,6 +246,7 @@ public class ProxyServer {
             socket.close();
 
         } catch (IOException e) {
+            // Fail to connect to server, resend the request to next available server
             currentTemp = sendCurrentTempRequest (roomNum);
         }
         return currentTemp;
