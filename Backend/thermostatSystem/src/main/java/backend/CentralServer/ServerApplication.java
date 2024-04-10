@@ -19,7 +19,7 @@ public class ServerApplication {
     private static List<ServerSocket> serverSockets;
     private boolean running = false;
 
-    private boolean iHaveLock = false; //TODO: change this to false
+    private volatile boolean iHaveLock = false; //TODO: change this to false
 
     private KafkaService kafkaService;
 
@@ -30,6 +30,7 @@ public class ServerApplication {
     private int currLeaderSync = 0; //linked with sync ports (for sync ports to know who is currently leader)
     private final int[] allElectionPorts = new int[]{10500, 10501, 10502, 10503};
     private final int[] db_ports = new int[]{12000, 12001, 12002, 12003};
+    private final int[] db_getTemp_ports = new int[]{12100, 12101, 12102, 12103};
     private final ClientHandler clientHandler;
     private Queue<Integer> criticalSectionQ = new LinkedList<>();
     private boolean isCSBusy = false;
@@ -43,6 +44,7 @@ public class ServerApplication {
         this.electionPort = electionPort;
         this.syncPort = syncPort;
         this.clientHandler = new ClientHandler(log);
+        kafkaService = new KafkaService(numberOfRooms);
         this.clientHandler.setKafkaService(kafkaService);
         log.info("This one port: " + this.proxyPort);
         initCentralServer();
@@ -50,14 +52,15 @@ public class ServerApplication {
         checkAlive();
         initiateElection();
 
-        receiveSyncMessage();
+        receiveAcquireMessages();
+
+        receiveLeaderSyncMessage();
     }
 
     public void checkAlive() {
         new Thread(() -> {
             while (true) {
                 synchronized (this) {
-                    //log.info("leader: " + currLeader + " elecPort: " + electionPort); //TODO: delete later maybe
                     if (currLeader != electionPort && currLeader > 0) {
                         try (Socket socket = new Socket()) {
                             // Timeout for connection attempt (in milliseconds)
@@ -81,7 +84,6 @@ public class ServerApplication {
             }
         }).start();
     }
-
 
     private String sendMessage(int port, String message) {
         try {
@@ -182,75 +184,60 @@ public class ServerApplication {
         }).start();
     }
 
-    //TODO: can prob just use sendOneMessage()
-    private void sendEnterCS(int thisSyncPort) {
-        try {
-            if(thisSyncPort != currLeaderSync) {
-                //socket setup
-                Socket socketOut = new Socket("localhost", currLeaderSync);
-                BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socketOut.getOutputStream()));
 
-                Socket socketIn = new Socket("localhost", thisSyncPort);
-                BufferedReader in = new BufferedReader(new InputStreamReader(socketIn.getInputStream()));
+    public void receiveAcquireMessages(){
+        new Thread(() -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(syncPort + 100);
+                log.info("Waiting for acquire message on port " + syncPort + "...");
 
-                //send request to leader
-                String message = "{ \"type\": \"Request\", \"portVal\":" + thisSyncPort + "}";
-                log.info("Sending this SYNC message: " + message + " to port: " + currLeaderSync);
-                out.write(message + "\n");
-                out.flush();
-                log.info("Message sent");
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+                    log.info("Acquire message received from: " + clientSocket.getInetAddress());
 
-                //TODO: problem here
-                // Indefinitely wait for acquire response from leader
-//                String response = null;
-//                boolean responseReceived = false;
-//                while (!responseReceived) { //TODO: may have to include an additonal condition here
-//                    try {
-//                        // Read the response (this will block until data is available or an EOF is reached)
-//                        response = in.readLine();
-//                        responseReceived = true; // Response received, exit loop
-//                    } catch (IOException e) {
-//                        // Handle IOException, e.g., connection reset by peer
-//                        //TODO: change later
-//                        log.info("Error reading sync response: " + e.getMessage());
-//                    }
-//                }
-                log.info("SendEnterCS(): Listening on port: " + thisSyncPort);
-                String response = in.readLine();
+                    BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    String message = in.readLine();
+                    log.info("Received message: " + message);
 
-                log.info("Received this message: " + response + " from port: " + currLeaderSync);
-
-                //close socket connections
-                in.close();
-                out.close();
-                socketOut.close();
-
-                //log.info("Received this message: " + response + " from port: " + currLeaderSync);
-
-                //allow replica to enter critical section
-                iHaveLock = true;
-            }
-            else {
-                if(criticalSectionQ.isEmpty()) {
-                    log.info("CSQ is empty!");
                     iHaveLock = true;
+
+                    in.close();
+                    clientSocket.close();
                 }
-                else {
-                    log.info("CSQ is not empty!");
-                    criticalSectionQ.add(thisSyncPort);
-                    iHaveLock = false;
-                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }).start();
+    }
+
+
+    //TODO: can prob just use sendOneMessage()
+    private void sendEnterCS() {
+        String message = "{ \"type\": \"Request\", \"portVal\":" + syncPort + "}";
+        try {
+            log.info("Sending this message: " + message + " to port: " + currLeaderSync);
+            Socket socket = new Socket("localhost", currLeaderSync);
+            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            out.write(message + "\n");
+            out.flush();
+            log.info("Message sent");
+
+            out.close();
+            socket.close();
+
+            while (!iHaveLock) {
+                Thread.onSpinWait();
             }
         } catch (Exception e) {
-            log.info("Error: " + e.getMessage() + e.getStackTrace());
+            log.info("Error: " + e.getMessage());
         }
     }
 
-    private void sendExitCS(int thisSyncPort) {
+    private void sendExitCS() {
         try {
-            String message = "{ \"type\": \"Release\", \"portVal\":" + thisSyncPort + "}";
-            log.info("Sending RELEASE message: " + message + " to port: " + thisSyncPort);
-            Socket socket = new Socket("localhost", thisSyncPort);
+            String message = "{ \"type\": \"Release\", \"portVal\":" + syncPort + "}";
+            log.info("Sending RELEASE message: " + message + " to port: " + currLeaderSync);
+            Socket socket = new Socket("localhost", currLeaderSync);
             BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             out.write(message + "\n");
             out.flush();
@@ -266,24 +253,70 @@ public class ServerApplication {
         }
     }
 
-    private void sendAcquire(int port, String message) {
-        try {
-            log.info("Sending ACQUIRE message: " + message + " to port: " + port);
-            Socket socket = new Socket("localhost", port);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            out.write(message + "\n");
-            out.flush();
-            log.info("ACQUIRE Message sent");
-
-            out.close();
-            socket.close();
-        } catch (Exception e) {
-            log.info("sendAcquire(): The replica on port: " + port + " is dead: " + e.getMessage());
-        }
-    }
-
     //only to be used if replica is the leader
-//    private void receiveSyncMessage() {
+    private void receiveLeaderSyncMessage() {
+        Thread receiverSyncThread = new Thread(() -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(syncPort);
+                log.info("Server started. Listening for messages...");
+
+                while (true) {
+                    if(currLeader == electionPort) {
+                        Socket clientSocket = serverSocket.accept();
+
+                        try {
+                            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+
+                            String message;
+                            while ((message = in.readLine()) != null) {
+                                log.info("Received this message: " + message);
+                                JSONObject messageJson = new JSONObject(message);
+                                switch (messageJson.getString("type")) {
+                                    case "Request" -> {
+                                        log.info("Request message: " + message);
+                                        int portVal = messageJson.getInt("portVal");
+                                        if(isCSBusy) { //critical section is busy
+                                            log.info("Critical Section is busy, adding sync port " + portVal + " to queue");
+                                            criticalSectionQ.add(portVal);
+                                        }
+                                        else { //critical section is not busy
+                                            log.info("Send acquire to sync port " + portVal);
+                                            isCSBusy = true;
+                                            sendOneMessage(portVal+100, "Acquire\n");
+                                        }
+                                    }
+                                    case "Release" -> {
+                                        log.info("Release message: " + message);
+                                        if(criticalSectionQ.isEmpty()) { //no replicas are waiting for CS
+                                            log.info("Release: Critical Section queue is empty");
+                                            isCSBusy = false; //CS is available
+                                        }
+                                        else { //at least one replica needs the CS
+                                            //take replica port out of the head of the queue
+                                            int portVal = criticalSectionQ.remove();
+                                            log.info("Send acquire to sync port " + portVal);
+                                            //inform the replica that it can enter CS
+                                            sendOneMessage(portVal+100, "Acquire\n");
+                                        }
+                                    }
+                                }
+                            }
+
+                            in.close();
+                            out.close();
+                            clientSocket.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warning("Error caught here: " + e.getMessage());
+            }
+        });
+
+        receiverSyncThread.start();
 //        Thread receiverThread = new Thread(() -> {
 //            try {
 //                ServerSocket serverSocket = new ServerSocket(syncPort);
@@ -296,6 +329,7 @@ public class ServerApplication {
 //                        Socket clientSocket = serverSocket.accept();
 //                        try {
 //                            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+//                            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 //
 //                            log.info("TEST 2");
 //                            String message;
@@ -306,33 +340,36 @@ public class ServerApplication {
 //                                    case "Request" -> {
 //                                        int portVal = messageJson.getInt("portVal");
 //                                        if(isCSBusy) { //critical section is busy
-//                                            log.info("REQUEST: Critical Section is busy, adding sync port " + portVal + " to queue");
+//                                            log.info("Critical Section is busy, adding sync port " + portVal + " to queue");
 //                                            criticalSectionQ.add(portVal);
 //                                        }
 //                                        else { //critical section is not busy
-//                                            log.info("REQUEST: Send acquire to sync port " + portVal);
+//                                            log.info("Send acquire to sync port " + portVal);
 //                                            isCSBusy = true;
-//                                            sendAcquire(portVal, "ACQUIRE ACK");
-//
+//                                            out.write("Acquire\n");
+//                                            out.flush();
 //                                        }
 //                                    }
 //                                    case "Release" -> {
 //                                        if(criticalSectionQ.isEmpty()) { //no replicas are waiting for CS
-//                                            log.info("RELEASE: Critical Section queue is empty");
+//                                            log.info("Release: Critical Section queue is empty");
 //                                            isCSBusy = false; //CS is available
 //                                        }
 //                                        else { //at least one replica needs the CS
 //                                            //take replica port out of the head of the queue
 //                                            int portVal = criticalSectionQ.remove();
-//
-//                                            log.info("RELEASE: Send acquire to sync port " + portVal);
+//                                            log.info("Send acquire to sync port " + portVal);
 //                                            //inform the replica that it can enter CS
-//                                            sendAcquire(portVal, "ACQUIRE ACK");
+//                                            out.write("Acquire\n");
+//                                            out.flush();
 //                                        }
 //                                    }
 //                                }
+//                                log.info("Waiting for message");
 //                            }
+//                            log.info("Waiting for message");
 //                            in.close();
+//                            out.close();
 //                            clientSocket.close();
 //                        } catch (IOException e) {
 //                            e.printStackTrace();
@@ -345,79 +382,7 @@ public class ServerApplication {
 //        });
 //
 //        receiverThread.start();
-//    }
-
-    private void receiveSyncMessage() {
-        Thread receiverThread = new Thread(() -> {
-            try {
-//                // Create a socket and connect it to the server
-//                Socket clientSocket = new Socket("localhost", syncPort);
-//                log.info("Connected to Sync Receiver on port " + syncPort);
-//
-//                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-
-                while (true) {
-                    // Create a socket and connect it to the server
-                    Socket clientSocket = new Socket("localhost", syncPort);
-                    log.info("Connected to Sync Receiver on port " + syncPort);
-
-                    BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-
-                    //if current replica is a leader
-                    if (currLeader == electionPort) {
-                        String message;
-                        while ((message = in.readLine()) != null) {
-                            log.info("Received this sync message: " + message);
-                            JSONObject messageJson = new JSONObject(message);
-                            switch (messageJson.getString("type")) {
-                                case "Request" -> {
-                                    int portVal = messageJson.getInt("portVal");
-                                    if (isCSBusy) {
-                                        log.info("REQUEST: Critical Section is busy, adding sync port " + portVal + " to queue");
-                                        criticalSectionQ.add(portVal);
-                                    } else {
-                                        log.info("REQUEST: Send acquire to sync port " + portVal);
-                                        isCSBusy = true;
-
-                                        //TODO: check
-                                        in.close();
-                                        clientSocket.close();
-                                        sendAcquire(portVal, "ACQUIRE ACK");
-                                    }
-                                }
-                                case "Release" -> {
-                                    if (criticalSectionQ.isEmpty()) {
-                                        log.info("RELEASE: Critical Section queue is empty");
-                                        isCSBusy = false;
-                                    } else {
-                                        int portVal = criticalSectionQ.remove();
-                                        log.info("RELEASE: Send acquire to sync port " + portVal);
-
-                                        //TODO: check
-                                        in.close();
-                                        clientSocket.close();
-                                        sendAcquire(portVal, "ACQUIRE ACK");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        in.close();
-                        clientSocket.close();
-                    }
-
-//                    in.close();
-//                    clientSocket.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-
-        receiverThread.start();
     }
-
 
     private void receiveMessage() {
         Thread receiverThread = new Thread(() -> {
@@ -479,14 +444,18 @@ public class ServerApplication {
             while (true) {
                 ConsumerRecords<String, String> records = kafkaService.consume();
                 if (!records.isEmpty()) {
+                    sendEnterCS();
+                    while (!iHaveLock) {
+                        Thread.onSpinWait();
+                    }
                     for (ConsumerRecord<String, String> record : records) {
                         log.info("Received this from thermostat: " + record.topic() + " " + record.value());
                         String topic = record.topic();
                         String numberStr = topic.substring("room".length());
                         int roomNum = Integer.parseInt(numberStr);
-//                        sendEnterCS(syncPort, "SYNC TEST"); //TODO: check this later
-                        clientHandler.updateData(roomNum, Integer.parseInt(record.value()));
+                        clientHandler.updateData(roomNum, Integer.parseInt(record.value()), record.timestamp());
                     }
+                    sendExitCS();
                 }
             }
         }
@@ -557,48 +526,53 @@ public class ServerApplication {
             this.kafkaService = service;
         }
 
-        public void updateData(int roomID, int temp) {
-            while (true){ //TODO: do we need this while loop???
-                log.info("SYNC TEST");
-                //request permission to enter CS from leader
-                sendEnterCS(syncPort);
-                if(iHaveLock){ //enter CS
-                    String centralServerAddress = "127.0.0.1";
-                    log.info("Update roomID: " + roomID + " temp: " + temp);
-//                    sendEnterCS(currLeaderSync, "SYNC TEST");
+        public void updateData(int roomID, int temp, long recordTimeStamp) {
+            String centralServerAddress = "127.0.0.1";
+            log.info("Update roomID: " + roomID + " temp: " + temp);
 
-                    for (int port : db_ports) {
-                        try {
-                            // Create a socket connection to the central server
-                            Socket socket = new Socket(centralServerAddress, port);
+            boolean dbUpdated = false;
+            while(!dbUpdated){
+                for (int port : db_ports) {
+                    try {
+                        // Create a socket connection to the central server
+                        Socket socket = new Socket(centralServerAddress, port);
 
-                            // Create output stream to send request
-                            OutputStream outputStream = socket.getOutputStream();
-                            PrintWriter out = new PrintWriter(outputStream, true);
+                        // Create output stream to send request
+                        OutputStream outputStream = socket.getOutputStream();
+                        PrintWriter out = new PrintWriter(outputStream, true);
 
-                            // Send request to the JAVA DB
-                            log.info("Send update request to port: " + port);
-                            String updateMassage = "{ \"type\": 1, \"room\":" + roomID + ", \"temperature\":" + temp + "}";
-                            out.println(updateMassage);
+                        // Send request to the JAVA DB
+                        log.info("Send update request to port: " + port);
+                        String updateMessage = "{ \"type\": 1, \"room\":" + roomID +
+                                ", \"temperature\":" + temp +
+                                ", \"timestamp\":"+ recordTimeStamp +"}";
+                        log.info("Message from thermo: " + updateMessage);
+                        out.println(updateMessage);
 
-                            // Create input stream to receive response
-                            InputStream inputStream = socket.getInputStream();
-                            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-                            Thread.sleep(10);
-                            out.close();
-                            in.close();
-                            socket.close();
-                        } catch (IOException e) {
-                            log.info("Update data port " + port + " is not available.");
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                        // Create input stream to receive response
+                        InputStream inputStream = socket.getInputStream();
+                        BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
+                        Thread.sleep(10);
+                        out.close();
+                        in.close();
+                        socket.close();
+                        dbUpdated = true;
+                        break;
+                    } catch (IOException e) {
+                        log.info("Update data port " + port + " is not available.");
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
-                    //exit out of CS
-                    sendExitCS(syncPort);
-                    break;
                 }
 
+                if(dbUpdated){
+                    break;
+                }
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
@@ -608,7 +582,7 @@ public class ServerApplication {
             String centralServerAddress = "127.0.0.1";
             log.info("Get temperature from roomID: " + roomID);
 
-            for (int port : db_ports) {
+            for (int port : db_getTemp_ports) {
                 try {
                     // Create a socket connection to the central server
                     Socket socket = new Socket(centralServerAddress, port);
@@ -633,8 +607,7 @@ public class ServerApplication {
                     in.close();
                     socket.close();
                     intValue = Integer.parseInt(respond);
-                    // return intValue;
-
+                    break;
                 } catch (IOException e) {
                     log.info("Get temp request data port " + port + " is not avalible.");
                 }
@@ -653,23 +626,26 @@ public class ServerApplication {
                     JSONObject roomTempJson = new JSONObject(instruction);
 
                     int type = roomTempJson.getInt("type");
-                    int room = roomTempJson.getInt("room");
+                    
 
 
                     if (type == 0) {
+                        int room = roomTempJson.getInt("room");
                         //Check current temperature
                         writer.write(Integer.toString(getTemp(room)) + "\n");
                         writer.flush();
                     } else if (type == 1) {
+                        int room = roomTempJson.getInt("room");
                         int temperature = roomTempJson.getInt("temperature");
                         //Change temperature
                         // Extract room and temperature values
-                        updateData(room, temperature);
                         kafkaService.setRoomTopic("room" + room);
                         kafkaService.produce(0, temperature);
                         log.info("Received a change temperature request for room: " + room + " value: " + temperature);
+                        writer.write("Changing success\n");
+                        writer.flush();
                     } else if (type == 2) {
-                        log.info("Received an Alive message");
+                        log.info("Received an Alive message from proxy");
                         // Return if replica is alive
                         writer.write("Alive\n");
                         writer.flush();
