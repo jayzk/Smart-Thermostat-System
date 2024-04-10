@@ -12,6 +12,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 
+/**
+ *  Main Central Server Application
+ *  Leader Election - Bully Algorithm (Pseudo Code copied from the slides)
+ *  Critical Section - Leader Based Algorithm (Pseudo Code from the slides)
+ */
+
 public class ServerApplication {
     private final int numberOfRooms;
 
@@ -19,7 +25,7 @@ public class ServerApplication {
     private static List<ServerSocket> serverSockets;
     private boolean running = false;
 
-    private volatile boolean iHaveLock = false; //TODO: change this to false
+    private volatile boolean iHaveLock = false;
 
     private KafkaService kafkaService;
 
@@ -37,6 +43,13 @@ public class ServerApplication {
 
     private final Logger log;
 
+    /**
+     * Constructor for Server Application
+     * @param numberOfRooms: Number of Hotel Rooms
+     * @param proxyPort: The Port for this server
+     * @param electionPort: The port used for election
+     * @param syncPort: The port used for synchronization between different server replicas
+     */
     public ServerApplication(int numberOfRooms, int proxyPort, int electionPort, int syncPort) {
         log = Logger.getLogger(ServerApplication.class.getName() + "-port:" + proxyPort);
         this.numberOfRooms = numberOfRooms;
@@ -57,6 +70,9 @@ public class ServerApplication {
         receiveLeaderSyncMessage();
     }
 
+    /**
+     * Method to check if the leader replica is alive, periodically checking every 2 seconds with a 1 second timeout
+     */
     public void checkAlive() {
         new Thread(() -> {
             while (true) {
@@ -85,6 +101,12 @@ public class ServerApplication {
         }).start();
     }
 
+    /**
+     * Send a message to the other replicas (could be an "Election", "Leader" or "Bully" message)
+     * @param port: port to send it to
+     * @param message: message to send
+     * @return: return the message received
+     */
     private String sendMessage(int port, String message) {
         try {
             log.info("Sending this message: " + message + " to port: " + port);
@@ -111,6 +133,11 @@ public class ServerApplication {
         }
     }
 
+    /**
+     * Send a message without waiting for a response to the port
+     * @param port: port number to send it to
+     * @param message: message to send
+     */
     private void sendOneMessage(int port, String message) {
         try {
             log.info("Sending this message: " + message + " to port: " + port);
@@ -127,6 +154,10 @@ public class ServerApplication {
         }
     }
 
+    /**
+     * Initiate the election in the case the replica notices a failure or when is booted
+     * Follows the same pseudo code as the one presented on the course slides
+     */
     public void initiateElection() {
         new Thread(() -> {
             running = true;
@@ -185,6 +216,9 @@ public class ServerApplication {
     }
 
 
+    /**
+     * Listen for any acquire message from the ports, used for the critical section leader based algorithm
+     */
     public void receiveAcquireMessages(){
         new Thread(() -> {
             try {
@@ -211,7 +245,9 @@ public class ServerApplication {
     }
 
 
-    //TODO: can prob just use sendOneMessage()
+    /**
+     * Send an enter to the Critical Section if the replica is trying to write to the database
+     */
     private void sendEnterCS() {
         String message = "{ \"type\": \"Request\", \"portVal\":" + syncPort + "}";
         try {
@@ -233,6 +269,9 @@ public class ServerApplication {
         }
     }
 
+    /**
+     * Send a release message when it is complete writing esentially releasing the lock
+     */
     private void sendExitCS() {
         try {
             String message = "{ \"type\": \"Release\", \"portVal\":" + syncPort + "}";
@@ -254,6 +293,11 @@ public class ServerApplication {
     }
 
     //only to be used if replica is the leader
+
+    /**
+     * This function is used by the leader replica, which listens for messages related to the Critical Section
+     * Similar structure and copies the pseudo code from the lecture, and runs different functionality based on the message type
+     */
     private void receiveLeaderSyncMessage() {
         Thread receiverSyncThread = new Thread(() -> {
             try {
@@ -317,73 +361,11 @@ public class ServerApplication {
         });
 
         receiverSyncThread.start();
-//        Thread receiverThread = new Thread(() -> {
-//            try {
-//                ServerSocket serverSocket = new ServerSocket(syncPort);
-//                log.info("Sync Receiver started on port " + syncPort + ". Listening for sync messages...");
-//
-//                while (true) {
-//                    //if current replica is a leader
-//                    if(currLeader == electionPort) {
-//                        log.info("TEST 1");
-//                        Socket clientSocket = serverSocket.accept();
-//                        try {
-//                            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-//                            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-//
-//                            log.info("TEST 2");
-//                            String message;
-//                            while ((message = in.readLine()) != null) {
-//                                log.info("Received this sync message: " + message);
-//                                JSONObject messageJson = new JSONObject(message);
-//                                switch (messageJson.getString("type")) {
-//                                    case "Request" -> {
-//                                        int portVal = messageJson.getInt("portVal");
-//                                        if(isCSBusy) { //critical section is busy
-//                                            log.info("Critical Section is busy, adding sync port " + portVal + " to queue");
-//                                            criticalSectionQ.add(portVal);
-//                                        }
-//                                        else { //critical section is not busy
-//                                            log.info("Send acquire to sync port " + portVal);
-//                                            isCSBusy = true;
-//                                            out.write("Acquire\n");
-//                                            out.flush();
-//                                        }
-//                                    }
-//                                    case "Release" -> {
-//                                        if(criticalSectionQ.isEmpty()) { //no replicas are waiting for CS
-//                                            log.info("Release: Critical Section queue is empty");
-//                                            isCSBusy = false; //CS is available
-//                                        }
-//                                        else { //at least one replica needs the CS
-//                                            //take replica port out of the head of the queue
-//                                            int portVal = criticalSectionQ.remove();
-//                                            log.info("Send acquire to sync port " + portVal);
-//                                            //inform the replica that it can enter CS
-//                                            out.write("Acquire\n");
-//                                            out.flush();
-//                                        }
-//                                    }
-//                                }
-//                                log.info("Waiting for message");
-//                            }
-//                            log.info("Waiting for message");
-//                            in.close();
-//                            out.close();
-//                            clientSocket.close();
-//                        } catch (IOException e) {
-//                            e.printStackTrace();
-//                        }
-//                    }
-//                }
-//            } catch (Exception e) {
-//                log.warning("Error caught here: " + e.getMessage());
-//            }
-//        });
-//
-//        receiverThread.start();
     }
 
+    /**
+     * This thread function listens for any changes to the Leader and Election (Bully algorithm)
+     */
     private void receiveMessage() {
         Thread receiverThread = new Thread(() -> {
             try {
@@ -439,28 +421,33 @@ public class ServerApplication {
         receiverThread.start();
     }
 
-    //TODO: use for CS entering
-        public void listenForCurrentTemp() {
-            while (true) {
-                ConsumerRecords<String, String> records = kafkaService.consume();
-                if (!records.isEmpty()) {
-                    sendEnterCS();
-                    while (!iHaveLock) {
-                        Thread.onSpinWait();
-                    }
-                    for (ConsumerRecord<String, String> record : records) {
-                        log.info("Received this from thermostat: " + record.topic() + " " + record.value());
-                        String topic = record.topic();
-                        String numberStr = topic.substring("room".length());
-                        int roomNum = Integer.parseInt(numberStr);
-                        clientHandler.updateData(roomNum, Integer.parseInt(record.value()), record.timestamp());
-                    }
-                    sendExitCS();
+    /**
+     * Kafka listener thread function to constantly listen for current room temperatures and update the database
+     */
+    public void listenForCurrentTemp() {
+        while (true) {
+            ConsumerRecords<String, String> records = kafkaService.consume();
+            if (!records.isEmpty()) {
+                sendEnterCS();
+                while (!iHaveLock) {
+                    Thread.onSpinWait();
                 }
+                for (ConsumerRecord<String, String> record : records) {
+                    log.info("Received this from thermostat: " + record.topic() + " " + record.value());
+                    String topic = record.topic();
+                    String numberStr = topic.substring("room".length());
+                    int roomNum = Integer.parseInt(numberStr);
+                    clientHandler.updateData(roomNum, Integer.parseInt(record.value()), record.timestamp());
+                }
+                sendExitCS();
             }
         }
+    }
 
 
+    /**
+     * Initialize the central server replica, starting up all the threads and initiating an election
+     */
     public void initCentralServer() {
         kafkaService = new KafkaService(numberOfRooms);
         kafkaService.initCentralServerConsumer();
@@ -483,8 +470,6 @@ public class ServerApplication {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            //
-            // int roomNum = 0;
             log.info("Contents of shared memory:");
             log.info("Shutdown complete.");
         }));
@@ -509,6 +494,9 @@ public class ServerApplication {
     }
 
 
+    /**
+     * Handler function to handle updates to the database and also listen for requests from the proxy.
+     */
     class ClientHandler{
         private Socket clientSocket;
         private KafkaService kafkaService;
@@ -522,15 +510,28 @@ public class ServerApplication {
             this.clientSocket = socket;
         }
 
+        /**
+         * Set up the kafka service to send temperature requests
+         * @param service: kafka service to use for sending messages
+         */
         public void setKafkaService(KafkaService service) {
             this.kafkaService = service;
         }
 
+        /**
+         * Function to update the database replice
+         * This function updates any available database replica which then uses passive replication to update the other databases
+         * @param roomID: room to update
+         * @param temp: temperature value to update
+         * @param recordTimeStamp: kafka record timestamp value
+         */
         public void updateData(int roomID, int temp, long recordTimeStamp) {
             String centralServerAddress = "127.0.0.1";
             log.info("Update roomID: " + roomID + " temp: " + temp);
 
             boolean dbUpdated = false;
+
+            //Keep on trying to update a database until one of the database is able to respond
             while(!dbUpdated){
                 for (int port : db_ports) {
                     try {
@@ -576,6 +577,11 @@ public class ServerApplication {
             }
         }
 
+        /**
+         * Function to retrieve the temperature value of a particular room
+         * @param roomID: room number query
+         * @return: temperature value of that room
+         */
         public int getTemp(int roomID) {
             int intValue = 0;
 
@@ -616,6 +622,9 @@ public class ServerApplication {
             return intValue;
         }
 
+        /**
+         * Listen for incoming messages from the proxy and update/read the database
+         */
         public void run() {
             try {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
