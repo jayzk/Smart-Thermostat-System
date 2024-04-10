@@ -187,7 +187,7 @@ public class ServerApplication {
                 }
                 if (response.isEmpty()) {
                     currLeader = electionPort;
-                    currLeaderSync = syncPort; //TODO: check
+                    currLeaderSync = syncPort;
                     log.info("-------CURRENT LEADER:--------" + currLeader);
                     for (int serverPort : allElectionPorts) {
                         if (serverPort != electionPort) {
@@ -392,7 +392,7 @@ public class ServerApplication {
                                 }
                                 case "Election" -> {
                                     if (messageJson.getInt("portVal") < electionPort) {
-                                        // Write code here to send a "Bully" message back to the client with the same port
+                                        //send a "Bully" message back to the client with the same port
                                         JSONObject responseJson = new JSONObject();
                                         String responseString = "Bully\n";
                                         out.write(responseString);
@@ -429,9 +429,11 @@ public class ServerApplication {
             ConsumerRecords<String, String> records = kafkaService.consume();
             if (!records.isEmpty()) {
                 sendEnterCS();
+                //Wait for the lock
                 while (!iHaveLock) {
                     Thread.onSpinWait();
                 }
+                // Update the database with the new messages
                 for (ConsumerRecord<String, String> record : records) {
                     log.info("Received this from thermostat: " + record.topic() + " " + record.value());
                     String topic = record.topic();
@@ -519,7 +521,7 @@ public class ServerApplication {
         }
 
         /**
-         * Function to update the database replice
+         * Function to update the database replica
          * This function updates any available database replica which then uses passive replication to update the other databases
          * @param roomID: room to update
          * @param temp: temperature value to update
