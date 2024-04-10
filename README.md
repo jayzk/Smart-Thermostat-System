@@ -1,6 +1,7 @@
 # SnugStay Systems (A Thermostat Distributed System)
 Final project for CPSC 559 at the University of Calgary
 
+![ProjectArchitecture.png](ProjectArchitecture.png)
 ## Contributors:
 - Parth Patel
 - Tanmay Mishra
