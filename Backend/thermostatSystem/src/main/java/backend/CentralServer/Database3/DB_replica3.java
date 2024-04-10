@@ -7,6 +7,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
+/**
+ * Spring boot application to run the replica
+ */
 @SpringBootApplication
 @EnableWebMvc
 public class DB_replica3 {

@@ -13,6 +13,9 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
+/**
+ * Spring boot application to create the kafka topics on creation
+ */
 @Component
 public class TopicCreator {
     @Value("${kafka.number-of-rooms}")

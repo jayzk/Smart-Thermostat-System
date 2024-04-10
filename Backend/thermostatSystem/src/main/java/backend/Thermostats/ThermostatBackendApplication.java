@@ -4,6 +4,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
+/**
+ * Spring boot application to run the thermostat application
+ */
 @SpringBootApplication
 @EnableWebMvc
 public class ThermostatBackendApplication {

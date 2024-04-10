@@ -13,6 +13,9 @@ import java.util.Collection;
 import java.util.Properties;
 import java.util.UUID;
 
+/**
+ * Kafka Service class to handle the producing and consuming of messages to the kafka brokers
+ */
 public class KafkaService {
 
     private KafkaConsumer<String, String> consumer;
@@ -21,12 +24,20 @@ public class KafkaService {
 
     private int numberOfRooms;
 
+    /**
+     * Create a kafka service for a particular room topic
+     * @param roomTopic: roomTopic to create a kafka service
+     */
     public KafkaService(String roomTopic){
         consumer = setKafkaConsumer();
         producer = setKafkaProducer();
         this.roomTopic = roomTopic;
     }
 
+    /**
+     * Create a kakfa service for multiple rooms
+     * @param numberOfRooms: number of rooms to create a kafka service for
+     */
     public KafkaService(int numberOfRooms){
         consumer = setKafkaConsumer();
         producer = setKafkaProducer();
@@ -37,6 +48,10 @@ public class KafkaService {
         this.roomTopic = roomTopic;
     }
 
+    /**
+     * Configure the kafka producer
+     * @return configured kafka producer
+     */
     public KafkaProducer<String, String> setKafkaProducer(){
         System.out.println("Kafka producer set");
         Properties props = new Properties();
@@ -50,6 +65,9 @@ public class KafkaService {
         return consumer.poll(Duration.ofMillis(100));
     }
 
+    /**
+     * Initialize the central server consumer by assigning topic partitions
+     */
     public void initCentralServerConsumer(){
         Collection<TopicPartition> partitions = new ArrayList<>();
 
@@ -59,6 +77,10 @@ public class KafkaService {
         consumer.assign(partitions);
     }
 
+    /**
+     * initialize the thermostat consumer and assign a topic partition
+     * @param partition: partition to assign
+     */
     public void initThermostatConsumer(int partition){
         Collection<TopicPartition> partitions = new ArrayList<>();
         partitions.add(new TopicPartition(this.roomTopic, partition));
@@ -66,11 +88,20 @@ public class KafkaService {
     }
 
 
+    /**
+     * Kafka produce function to produce messages
+     * @param partition: partition to send to
+     * @param currentTemp: temperature value to update
+     */
     public void produce(int partition, int currentTemp){
         ProducerRecord<String, String> record = new ProducerRecord<>(this.roomTopic, Integer.toString(partition), Integer.toString(currentTemp));
         producer.send(record);
     }
 
+    /**
+     * Configure the Kafka Consumer
+     * @return the configured kafka consumer
+     */
     private KafkaConsumer<String, String> setKafkaConsumer() {
         Properties props = new Properties();
         props.setProperty("bootstrap.servers", "localhost:9092");
